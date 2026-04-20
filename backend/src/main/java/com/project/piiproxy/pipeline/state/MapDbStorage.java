@@ -6,7 +6,7 @@ import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
 
-public class MapDbStorage implements PiiStorage {
+public class MapDbStorage implements PiiStorage, SessionCleaner {
 
   private final DB db;
   private final HTreeMap<String, String> piiMap;
@@ -49,5 +49,13 @@ public class MapDbStorage implements PiiStorage {
   @Override
   public String getCachedAnonymizedText(String sessionId, String textHash) {
     return messageCache.get(sessionId + "_" + textHash);
+  }
+
+  @Override
+  public void clearSession(String sessionId) {
+    String prefix = sessionId + "_";
+    piiMap.keySet().removeIf(key -> key.startsWith(prefix));
+    counters.keySet().removeIf(key -> key.startsWith(prefix));
+    messageCache.keySet().removeIf(key -> key.startsWith(prefix));
   }
 }

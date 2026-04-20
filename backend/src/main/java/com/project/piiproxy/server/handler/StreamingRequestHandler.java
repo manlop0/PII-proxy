@@ -2,6 +2,7 @@ package com.project.piiproxy.server.handler;
 
 import com.project.piiproxy.pipeline.core.RequestAnonymizer;
 import com.project.piiproxy.pipeline.core.StreamingResponseRestorer;
+import com.project.piiproxy.pipeline.state.SessionCleaner;
 import com.project.piiproxy.provider.LlmProvider;
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
@@ -10,20 +11,20 @@ import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.RequestOptions;
 import io.vertx.core.json.JsonObject;
-import io.vertx.core.parsetools.RecordParser;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.client.HttpRequest;
 
 public class StreamingRequestHandler implements LlmRequestHandler {
 
   private final RequestAnonymizer anonymizer;
   private final StreamingResponseRestorer restorer;
   private final HttpClient httpClient;
+  private final SessionCleaner sessionCleaner;
 
-  public StreamingRequestHandler(RequestAnonymizer anonymizer, StreamingResponseRestorer restorer, HttpClient httpClient) {
+  public StreamingRequestHandler(RequestAnonymizer anonymizer, StreamingResponseRestorer restorer, HttpClient httpClient, SessionCleaner sessionCleaner) {
     this.anonymizer = anonymizer;
     this.restorer = restorer;
     this.httpClient = httpClient;
+    this.sessionCleaner = sessionCleaner;
   }
 
   @Override
@@ -58,6 +59,13 @@ public class StreamingRequestHandler implements LlmRequestHandler {
 
         response.endHandler(v -> {
           ctx.response().end();
+          cleanupIfEphemeral(sessionId, isEphemeral);
+        });
+
+        response.exceptionHandler(err -> {
+          System.err.println("Stream interrupted: " + err.getMessage());
+          if (!ctx.response().ended()) ctx.response().end();
+          cleanupIfEphemeral(sessionId, isEphemeral);
         });
       })
       .onFailure(err -> {
@@ -65,13 +73,14 @@ public class StreamingRequestHandler implements LlmRequestHandler {
         if (!ctx.response().ended()) {
           ctx.response().end();
         }
+        cleanupIfEphemeral(sessionId, isEphemeral);
       });
   }
 
   private void cleanupIfEphemeral(String sessionId, boolean isEphemeral) {
     if (isEphemeral) {
       System.out.println("Cleaning up ephemeral session: " + sessionId);
-      // TODO: Remove sessionId from MapDB
+      sessionCleaner.clearSession(sessionId);
     }
   }
 }

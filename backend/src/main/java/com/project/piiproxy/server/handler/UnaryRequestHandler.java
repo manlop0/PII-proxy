@@ -2,15 +2,14 @@ package com.project.piiproxy.server.handler;
 
 import com.project.piiproxy.pipeline.core.RequestAnonymizer;
 import com.project.piiproxy.pipeline.core.UnaryResponseRestorer;
+import com.project.piiproxy.pipeline.state.SessionCleaner;
 import com.project.piiproxy.provider.LlmProvider;
 import io.vertx.core.MultiMap;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.RequestOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.client.HttpRequest;
 
 
 public class UnaryRequestHandler implements LlmRequestHandler {
@@ -18,11 +17,13 @@ public class UnaryRequestHandler implements LlmRequestHandler {
   private final RequestAnonymizer anonymizer;
   private final UnaryResponseRestorer restorer;
   private final HttpClient httpClient;
+  private final SessionCleaner sessionCleaner;
 
-  public UnaryRequestHandler(RequestAnonymizer anonymizer, UnaryResponseRestorer restorer, HttpClient httpClient) {
+  public UnaryRequestHandler(RequestAnonymizer anonymizer, UnaryResponseRestorer restorer, HttpClient httpClient, SessionCleaner sessionCleaner) {
     this.anonymizer = anonymizer;
     this.restorer = restorer;
     this.httpClient = httpClient;
+    this.sessionCleaner = sessionCleaner;
   }
 
   @Override
@@ -54,26 +55,39 @@ public class UnaryRequestHandler implements LlmRequestHandler {
         .remove("Content-Length")
         .remove("Accept-Encoding");
 
-      response.body().onSuccess(buffer -> {
-        try {
-          JsonObject responseJson = buffer.toJsonObject();
-          restorer.restoreResponse(responseJson, sessionId);
+        response.body().onComplete(ar -> {
+          if (ar.succeeded()) {
+            try {
+              JsonObject responseJson = ar.result().toJsonObject();
+              restorer.restoreResponse(responseJson, sessionId);
 
-          ctx.response().headers().addAll(responseHeaders);
-          ctx.response()
-            .setStatusCode(response.statusCode())
-            .end(responseJson.toBuffer());
-        } catch (Exception e) {
-          ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response\"}");
-        }
-      });
+              ctx.response().headers().addAll(responseHeaders);
+              ctx.response()
+                .setStatusCode(response.statusCode())
+                .end(responseJson.toBuffer());
+
+            } catch (Exception e) {
+              System.err.println("JSON Parse Error: " + e.getMessage());
+              if (!ctx.response().ended()) {
+                ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response (Parse Error)\"}");
+              }
+            }
+          } else {
+            System.err.println("Failed to read full response body: " + ar.cause().getMessage());
+            if (!ctx.response().ended()) {
+              ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response (Read Error)\"}");
+            }
+          }
+
+          cleanupIfEphemeral(sessionId, isEphemeral);
+        });
     }).onFailure(err -> failRequest(ctx, err));
   }
 
   private void cleanupIfEphemeral(String sessionId, boolean isEphemeral) {
     if (isEphemeral) {
       System.out.println("Cleaning up ephemeral session: " + sessionId);
-      // TODO: remove sessionId from MapDB
+      sessionCleaner.clearSession(sessionId);
     }
   }
 

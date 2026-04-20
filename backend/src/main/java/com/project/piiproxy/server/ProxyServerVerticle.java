@@ -43,7 +43,7 @@ public class ProxyServerVerticle extends VerticleBase {
 
     HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
 
-    PiiStorage storage = new MapDbStorage();
+    MapDbStorage storage = new MapDbStorage();
 
     List<TextFilter> filters = List.of(
       new EmailFilter(),
@@ -58,8 +58,8 @@ public class ProxyServerVerticle extends VerticleBase {
     UnaryResponseRestorer unaryRestorer = new UnaryResponseRestorer(analyzer);
     StreamingResponseRestorer streamingRestorer = new StreamingResponseRestorer(analyzer);
 
-    LlmRequestHandler unaryHandler = new UnaryRequestHandler(requestAnonymizer, unaryRestorer, httpClient);
-    LlmRequestHandler streamingHandler = new StreamingRequestHandler(requestAnonymizer, streamingRestorer, httpClient);
+    LlmRequestHandler unaryHandler = new UnaryRequestHandler(requestAnonymizer, unaryRestorer, httpClient, storage);
+    LlmRequestHandler streamingHandler = new StreamingRequestHandler(requestAnonymizer, streamingRestorer, httpClient, storage);
 
 
     Router router = Router.router(vertx);

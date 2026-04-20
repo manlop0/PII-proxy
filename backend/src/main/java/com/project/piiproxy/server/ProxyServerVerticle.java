@@ -1,6 +1,7 @@
 package com.project.piiproxy.server;
 
 import com.project.piiproxy.pipeline.core.RequestAnonymizer;
+import com.project.piiproxy.pipeline.core.StreamingResponseRestorer;
 import com.project.piiproxy.pipeline.core.TextAnalyzer;
 import com.project.piiproxy.pipeline.core.UnaryResponseRestorer;
 import com.project.piiproxy.pipeline.filter.TextFilter;
@@ -18,6 +19,8 @@ import com.project.piiproxy.server.handler.UnaryRequestHandler;
 import io.vertx.core.Future;
 import io.vertx.core.MultiMap;
 import io.vertx.core.VerticleBase;
+import io.vertx.core.http.HttpClient;
+import io.vertx.core.http.HttpClientOptions;
 import io.vertx.core.json.DecodeException;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
@@ -30,25 +33,6 @@ import java.util.UUID;
 
 public class ProxyServerVerticle extends VerticleBase {
   private final ProviderRegistry registry;
-  private WebClient webClient;
-
-  private final PiiStorage storage = new MapDbStorage();
-
-  List<TextFilter> filters = List.of(
-    new EmailFilter(),
-    new PhoneFilter(),
-    new CreditCardFilter(),
-    new IpAddressFilter()
-  );
-
-  private final TextAnalyzer analyzer = new TextAnalyzer(storage, filters);
-
-  private final RequestAnonymizer requestAnonymizer = new RequestAnonymizer(analyzer);
-  private final UnaryResponseRestorer unaryRestorer = new UnaryResponseRestorer(analyzer);
-  // TODO: StreamingResponseRestorer streamingRestorer = new StreamingResponseRestorer(analyzer);
-
-  private final LlmRequestHandler unaryHandler = new UnaryRequestHandler(requestAnonymizer, unaryRestorer);
-  private final LlmRequestHandler streamingHandler = new StreamingRequestHandler();
 
   public ProxyServerVerticle(ProviderRegistry registry) {
     this.registry = registry;
@@ -56,7 +40,27 @@ public class ProxyServerVerticle extends VerticleBase {
 
   @Override
   public Future<?> start() {
-    this.webClient = WebClient.create(vertx, new WebClientOptions().setKeepAlive(true));
+
+    HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
+
+    PiiStorage storage = new MapDbStorage();
+
+    List<TextFilter> filters = List.of(
+      new EmailFilter(),
+      new PhoneFilter(),
+      new CreditCardFilter(),
+      new IpAddressFilter()
+    );
+
+    TextAnalyzer analyzer = new TextAnalyzer(storage, filters);
+
+    RequestAnonymizer requestAnonymizer = new RequestAnonymizer(analyzer);
+    UnaryResponseRestorer unaryRestorer = new UnaryResponseRestorer(analyzer);
+    StreamingResponseRestorer streamingRestorer = new StreamingResponseRestorer(analyzer);
+
+    LlmRequestHandler unaryHandler = new UnaryRequestHandler(requestAnonymizer, unaryRestorer, httpClient);
+    LlmRequestHandler streamingHandler = new StreamingRequestHandler(requestAnonymizer, streamingRestorer, httpClient);
+
 
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
@@ -90,19 +94,12 @@ public class ProxyServerVerticle extends VerticleBase {
       }
 
       String targetPath = ctx.request().path().substring(("/" + provider.getId()).length());
-      MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
-        .addAll(ctx.request().headers())
-        .remove("Host");
-
-      var httpRequest = webClient.post(provider.getPort(), provider.getHost(), targetPath)
-        .ssl(provider.getPort() == 443)
-        .putHeaders(requestHeaders);
 
       boolean isStream = requestBody.getBoolean("stream", false);
       if (isStream) {
-        streamingHandler.handle(ctx, httpRequest, requestBody, sessionId, isEphemeral);
+        streamingHandler.handle(ctx, requestBody, sessionId, isEphemeral, provider, targetPath);
       } else {
-        unaryHandler.handle(ctx, httpRequest, requestBody, sessionId, isEphemeral);
+        unaryHandler.handle(ctx, requestBody, sessionId, isEphemeral, provider, targetPath);
       }
     });
 

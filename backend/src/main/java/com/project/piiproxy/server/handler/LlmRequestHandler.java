@@ -1,5 +1,6 @@
 package com.project.piiproxy.server.handler;
 
+import com.project.piiproxy.provider.LlmProvider;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 import io.vertx.ext.web.client.HttpRequest;
@@ -11,11 +12,13 @@ public interface LlmRequestHandler {
    * @param httpRequest - A prepared request to the LLM API (with the necessary headers)
    * @param requestBody - JSON request body
    * @param sessionId - Session ID (transmitted or generated)
-   * @param isEphemeral - Session flag (should the cache be cleared at the end)
+   * @param provider - Target provider (OpenAI, OpenRouter, etc.)
+   * @param targetPath - API path (e.g., /v1/chat/completions)
    */
   void handle(RoutingContext ctx,
-              HttpRequest<Buffer> httpRequest,
               JsonObject requestBody,
               String sessionId,
-              boolean isEphemeral);
+              boolean isEphemeral,
+              LlmProvider provider,
+              String targetPath);
 }

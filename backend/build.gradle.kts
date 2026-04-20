@@ -30,6 +30,7 @@ dependencies {
   implementation("io.vertx:vertx-web-client")
   implementation("io.vertx:vertx-web")
   implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
+  implementation("org.mapdb:mapdb:3.0.9")
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")

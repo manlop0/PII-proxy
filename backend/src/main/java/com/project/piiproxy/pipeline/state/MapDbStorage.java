@@ -11,11 +11,13 @@ public class MapDbStorage implements PiiStorage {
   private final DB db;
   private final HTreeMap<String, String> piiMap;
   private final HTreeMap<String, Integer> counters;
+  private final HTreeMap<String, String> messageCache;
 
   public MapDbStorage() {
     this.db = DBMaker.memoryDB().closeOnJvmShutdown().make();
     this.piiMap = db.hashMap("piiMap", Serializer.STRING, Serializer.STRING).createOrOpen();
     this.counters = db.hashMap("counters", Serializer.STRING, Serializer.INTEGER).createOrOpen();
+    this.messageCache = db.hashMap("messageCache", Serializer.STRING, Serializer.STRING).createOrOpen();
   }
 
   @Override
@@ -37,5 +39,15 @@ public class MapDbStorage implements PiiStorage {
   @Override
   public String getOriginal(String sessionId, String tag) {
     return piiMap.get(sessionId + "_" + tag);
+  }
+
+  @Override
+  public void cacheAnonymizedText(String sessionId, String textHash, String anonymizedText) {
+    messageCache.put(sessionId + "_" + textHash, anonymizedText);
+  }
+
+  @Override
+  public String getCachedAnonymizedText(String sessionId, String textHash) {
+    return messageCache.get(sessionId + "_" + textHash);
   }
 }

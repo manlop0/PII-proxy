@@ -1,5 +1,15 @@
 package com.project.piiproxy.server;
 
+import com.project.piiproxy.pipeline.core.RequestAnonymizer;
+import com.project.piiproxy.pipeline.core.TextAnalyzer;
+import com.project.piiproxy.pipeline.core.UnaryResponseRestorer;
+import com.project.piiproxy.pipeline.filter.TextFilter;
+import com.project.piiproxy.pipeline.filter.regex.CreditCardFilter;
+import com.project.piiproxy.pipeline.filter.regex.EmailFilter;
+import com.project.piiproxy.pipeline.filter.regex.IpAddressFilter;
+import com.project.piiproxy.pipeline.filter.regex.PhoneFilter;
+import com.project.piiproxy.pipeline.state.MapDbStorage;
+import com.project.piiproxy.pipeline.state.PiiStorage;
 import com.project.piiproxy.provider.LlmProvider;
 import com.project.piiproxy.provider.ProviderRegistry;
 import com.project.piiproxy.server.handler.LlmRequestHandler;
@@ -15,13 +25,29 @@ import io.vertx.ext.web.client.WebClient;
 import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.ext.web.handler.BodyHandler;
 
+import java.util.List;
 import java.util.UUID;
 
 public class ProxyServerVerticle extends VerticleBase {
   private final ProviderRegistry registry;
   private WebClient webClient;
 
-  private final LlmRequestHandler unaryHandler = new UnaryRequestHandler();
+  private final PiiStorage storage = new MapDbStorage();
+
+  List<TextFilter> filters = List.of(
+    new EmailFilter(),
+    new PhoneFilter(),
+    new CreditCardFilter(),
+    new IpAddressFilter()
+  );
+
+  private final TextAnalyzer analyzer = new TextAnalyzer(storage, filters);
+
+  private final RequestAnonymizer requestAnonymizer = new RequestAnonymizer(analyzer);
+  private final UnaryResponseRestorer unaryRestorer = new UnaryResponseRestorer(analyzer);
+  // TODO: StreamingResponseRestorer streamingRestorer = new StreamingResponseRestorer(analyzer);
+
+  private final LlmRequestHandler unaryHandler = new UnaryRequestHandler(requestAnonymizer, unaryRestorer);
   private final LlmRequestHandler streamingHandler = new StreamingRequestHandler();
 
   public ProxyServerVerticle(ProviderRegistry registry) {

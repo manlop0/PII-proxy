@@ -1,0 +1,9 @@
+server:
+  port: 8080
+
+pipeline:
+  filters:
+    email: true
+    phone: true
+    credit_card: true
+    ip_address: true

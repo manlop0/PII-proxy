@@ -29,6 +29,8 @@ dependencies {
   implementation("io.vertx:vertx-launcher-application")
   implementation("io.vertx:vertx-web-client")
   implementation("io.vertx:vertx-web")
+  implementation("io.vertx:vertx-config")
+  implementation("io.vertx:vertx-config-yaml")
   implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
   implementation("org.mapdb:mapdb:3.0.9")
   testImplementation("io.vertx:vertx-junit5")

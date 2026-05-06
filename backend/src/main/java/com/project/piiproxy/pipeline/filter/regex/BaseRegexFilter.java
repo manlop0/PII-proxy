@@ -27,7 +27,23 @@ public abstract class BaseRegexFilter implements TextFilter {
     Matcher matcher = pattern.matcher(text);
 
     while (matcher.find()) {
-      spans.add(new Span(matcher.start(), matcher.end(), type, matcher.group()));
+      String value = matcher.group();
+      int start = matcher.start();
+      int end = matcher.end();
+
+      while (!value.isEmpty() && Character.isWhitespace(value.charAt(0))) {
+        value = value.substring(1);
+        start++;
+      }
+
+      while (!value.isEmpty() && Character.isWhitespace(value.charAt(value.length() - 1))) {
+        value = value.substring(0, value.length() - 1);
+        end--;
+      }
+
+      if (!value.isEmpty()) {
+        spans.add(new Span(start, end, type, value));
+      }
     }
     return spans;
   }

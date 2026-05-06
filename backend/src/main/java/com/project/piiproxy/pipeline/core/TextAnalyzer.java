@@ -69,7 +69,9 @@ public class TextAnalyzer {
     while (matcher.find()) {
       String tag = matcher.group();
       String original = storage.getOriginal(sessionId, tag);
-      matcher.appendReplacement(result, original != null ? original : tag);
+
+      String safeReplacement = Matcher.quoteReplacement(original != null ? original : tag);
+      matcher.appendReplacement(result, safeReplacement);
     }
     matcher.appendTail(result);
     String restoredText = result.toString();

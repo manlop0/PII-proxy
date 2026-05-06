@@ -1,6 +1,6 @@
 package com.project.piiproxy.pipeline.core;
 
-import java.util.regex.Pattern;
+import com.google.re2j.Pattern;
 
 public class SessionStreamProcessor {
 

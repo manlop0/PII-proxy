@@ -6,8 +6,9 @@ import com.project.piiproxy.pipeline.model.Span;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+
+import com.google.re2j.Matcher;
+import com.google.re2j.Pattern;
 
 public abstract class BaseRegexFilter implements TextFilter {
   private final Pattern pattern;

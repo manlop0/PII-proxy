@@ -74,6 +74,27 @@ public class OpenAiAdapter implements LlmJsonAdapter {
     }
   }
 
+  @Override
+  public void injectGatewaySystemPrompt(JsonObject requestBody, String gatewayPrompt) {
+    if (gatewayPrompt == null || gatewayPrompt.isBlank()) return;
+
+    JsonArray messages = requestBody.getJsonArray("messages");
+    if (messages == null || messages.isEmpty()) return;
+
+    JsonObject firstMessage = messages.getJsonObject(0);
+    String role = firstMessage.getString("role");
+
+    if ("system".equals(role) || "developer".equals(role)) {
+      String oldContent = firstMessage.getString("content", "");
+      firstMessage.put("content", oldContent + "\n\n[Gateway Note]: " + gatewayPrompt);
+    } else {
+      JsonObject sysMsg = new JsonObject()
+        .put("role", "system")
+        .put("content", "[Gateway Note]: " + gatewayPrompt);
+      messages.add(0, sysMsg);
+    }
+  }
+
   private void redactField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
     String text = obj.getString(field);
     if (text != null && !text.isBlank()) {

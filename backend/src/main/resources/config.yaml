@@ -5,6 +5,15 @@ storage:
   path: "./data/pii-cache.db"
 
 pipeline:
+  gateway_system_prompt: >
+    System Note: Enterprise Data Privacy Gateway Active.
+    You will see entities formatted as tags in the text (e.g., <PERSON_1>, <PHONE_1>, <CREDIT_CARD_1>).
+    CRITICAL INSTRUCTION: You MUST treat these tags as the literal, actual data.
+    Treat <PERSON_1> as the person's actual name, and <PHONE_1> as the actual phone number.
+    Interact with them naturally, logically, and empathetically as concrete entities, NOT as placeholders or templates.
+    Do NOT mention that the data is masked or anonymized.
+    Always output these exact tags when referring to these entities in your reasoning and final response..
+
   filters:
     email: true
     phone: true

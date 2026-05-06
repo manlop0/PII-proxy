@@ -36,9 +36,12 @@ public class AppConfigurator {
     String dbPath = storageConfig.getString("path", "./data/pii-cache.db");
     MapDbStorage storage = new MapDbStorage(dbPath);
 
+
+    JsonObject pipelineConfig = config.getJsonObject("pipeline", new JsonObject());
+    String systemPrompt = pipelineConfig.getString("gateway_system_prompt", "");
+
     List<TextFilter> filters = new ArrayList<>();
-    JsonObject filtersConfig = config.getJsonObject("pipeline", new JsonObject())
-                                     .getJsonObject("filters", new JsonObject());
+    JsonObject filtersConfig = pipelineConfig.getJsonObject("filters", new JsonObject());
 
     if (filtersConfig.getBoolean("email", true)) filters.add(new EmailFilter());
     if (filtersConfig.getBoolean("phone", true)) filters.add(new PhoneFilter());
@@ -47,7 +50,7 @@ public class AppConfigurator {
 
     TextAnalyzer analyzer = new TextAnalyzer(storage, filters);
 
-    RequestAnonymizer anonymizer = new RequestAnonymizer(analyzer);
+    RequestAnonymizer anonymizer = new RequestAnonymizer(analyzer, systemPrompt);
     UnaryResponseRestorer unaryRestorer = new UnaryResponseRestorer(analyzer);
     StreamingResponseRestorer streamingRestorer = new StreamingResponseRestorer(analyzer);
 

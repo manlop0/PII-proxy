@@ -15,4 +15,6 @@ public interface LlmJsonAdapter {
   List<String> getStreamProcessorKeys();
 
   void restoreStreamChunk(JsonObject jsonChunk, Map<String, SessionStreamProcessor> processors);
+
+  void injectGatewaySystemPrompt(JsonObject requestBody, String gatewayPrompt);
 }

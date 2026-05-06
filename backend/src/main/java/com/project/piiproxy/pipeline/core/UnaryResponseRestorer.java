@@ -1,5 +1,6 @@
 package com.project.piiproxy.pipeline.core;
 
+import com.project.piiproxy.provider.adapter.LlmJsonAdapter;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
@@ -11,17 +12,7 @@ public class UnaryResponseRestorer {
     this.analyzer = analyzer;
   }
 
-  public void restoreResponse(JsonObject responseBody, String sessionId) {
-    JsonArray choices = responseBody.getJsonArray("choices");
-    if (choices != null && !choices.isEmpty()) {
-      JsonObject message = choices.getJsonObject(0).getJsonObject("message");
-      if (message != null) {
-        String content = message.getString("content");
-        if (content != null) {
-          String restoredContent = analyzer.restoreText(content, sessionId);
-          message.put("content", restoredContent);
-        }
-      }
-    }
+  public void restoreResponse(JsonObject responseBody, String sessionId, LlmJsonAdapter adapter) {
+    adapter.restoreUnaryResponse(responseBody, sessionId, analyzer);
   }
 }

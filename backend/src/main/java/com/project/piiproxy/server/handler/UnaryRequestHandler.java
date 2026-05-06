@@ -29,7 +29,7 @@ public class UnaryRequestHandler implements LlmRequestHandler {
   @Override
   public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
 
-    anonymizer.redactRequest(requestBody, sessionId);
+    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter());
 
     MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
       .addAll(ctx.request().headers())
@@ -59,7 +59,7 @@ public class UnaryRequestHandler implements LlmRequestHandler {
           if (ar.succeeded()) {
             try {
               JsonObject responseJson = ar.result().toJsonObject();
-              restorer.restoreResponse(responseJson, sessionId);
+              restorer.restoreResponse(responseJson, sessionId, provider.getAdapter());
 
               ctx.response().headers().addAll(responseHeaders);
               ctx.response()

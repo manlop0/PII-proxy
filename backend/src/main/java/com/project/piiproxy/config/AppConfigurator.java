@@ -32,7 +32,9 @@ public class AppConfigurator {
 
     HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
 
-    MapDbStorage storage = new MapDbStorage();
+    JsonObject storageConfig = config.getJsonObject("storage", new JsonObject());
+    String dbPath = storageConfig.getString("path", "./data/pii-cache.db");
+    MapDbStorage storage = new MapDbStorage(dbPath);
 
     List<TextFilter> filters = new ArrayList<>();
     JsonObject filtersConfig = config.getJsonObject("pipeline", new JsonObject())
@@ -76,8 +78,13 @@ public class AppConfigurator {
       boolean isEphemeral = false;
 
       if (sessionId == null || sessionId.isBlank()) {
+        sessionId = requestBody.getString("user");
+      }
+
+      if (sessionId == null || sessionId.isBlank()) {
         sessionId = UUID.randomUUID().toString();
         isEphemeral = true;
+        System.out.println("WARN: No Session ID found in Headers or JSON. Using Ephemeral ID: " + sessionId);
       }
 
       String targetPath = ctx.request().path().substring(("/" + provider.getId()).length());

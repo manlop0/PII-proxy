@@ -1,0 +1,90 @@
+package com.project.piiproxy.provider.adapter;
+
+import com.project.piiproxy.pipeline.core.SessionStreamProcessor;
+import com.project.piiproxy.pipeline.core.TextAnalyzer;
+import io.vertx.core.json.Json;
+import io.vertx.core.json.JsonArray;
+import io.vertx.core.json.JsonObject;
+
+import java.util.List;
+import java.util.Map;
+
+public class OpenAiAdapter implements LlmJsonAdapter {
+
+  @Override
+  public void redactRequest(JsonObject requestBody, String sessionId, TextAnalyzer analyzer) {
+    JsonArray messages = requestBody.getJsonArray("messages");
+    if (messages == null) return;
+
+    for (int i = 0; i < messages.size(); i++) {
+      JsonObject message = messages.getJsonObject(i);
+      redactField(message, "content", sessionId, analyzer);
+      redactField(message, "reasoning", sessionId, analyzer);
+      redactField(message, "thought", sessionId, analyzer);
+    }
+  }
+
+  @Override
+  public void restoreUnaryResponse(JsonObject responseBody, String sessionId, TextAnalyzer analyzer) {
+    JsonArray choices = responseBody.getJsonArray("choices");
+    if (choices != null && !choices.isEmpty()) {
+      JsonObject message = choices.getJsonObject(0).getJsonObject("message");
+      if (message != null) {
+        restoreField(message, "content", sessionId, analyzer);
+        restoreField(message, "reasoning", sessionId, analyzer);
+
+        JsonObject reasoning_details = message.getJsonArray("reasoning_details").getJsonObject(0);
+        if (reasoning_details != null) {
+          restoreField(reasoning_details, "text", sessionId, analyzer);
+        }
+      }
+    }
+  }
+
+  @Override
+  public List<String> getStreamProcessorKeys() {
+    return List.of("content", "reasoning", "reasoning_details");
+  }
+
+  @Override
+  public void restoreStreamChunk(JsonObject jsonChunk, Map<String, SessionStreamProcessor> processors) {
+    JsonArray choices = jsonChunk.getJsonArray("choices");
+    if (choices != null && !choices.isEmpty()) {
+      JsonObject delta = choices.getJsonObject(0).getJsonObject("delta");
+      if (delta != null) {
+        if (delta.containsKey("content")) {
+          String safe = processors.get("content").processChunk(delta.getString("content"));
+          delta.put("content", safe);
+        }
+        if (delta.containsKey("reasoning")) {
+          String safe = processors.get("reasoning").processChunk(delta.getString("reasoning"));
+          delta.put("reasoning", safe);
+        }
+        if (delta.containsKey("reasoning_details")) {
+          JsonArray details = delta.getJsonArray("reasoning_details");
+          for (int i = 0; i < details.size(); i++) {
+            JsonObject detail = details.getJsonObject(i);
+            if (detail.containsKey("text")) {
+              String safe = processors.get("reasoning_details").processChunk(detail.getString("text"));
+              detail.put("text", safe);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private void redactField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
+    String text = obj.getString(field);
+    if (text != null && !text.isBlank()) {
+      obj.put(field, analyzer.anonymizeText(text, sessionId));
+    }
+  }
+
+  private void restoreField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
+    String text = obj.getString(field);
+    if (text != null && !text.isBlank()) {
+      obj.put(field, analyzer.restoreText(text, sessionId));
+    }
+  }
+}

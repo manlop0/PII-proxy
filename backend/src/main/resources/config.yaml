@@ -1,6 +1,9 @@
 server:
   port: 8080
 
+storage:
+  path: "./data/pii-cache.db"
+
 pipeline:
   filters:
     email: true

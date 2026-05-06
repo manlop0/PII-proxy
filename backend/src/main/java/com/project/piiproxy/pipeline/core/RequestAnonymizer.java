@@ -1,6 +1,6 @@
 package com.project.piiproxy.pipeline.core;
 
-import io.vertx.core.json.JsonArray;
+import com.project.piiproxy.provider.adapter.LlmJsonAdapter;
 import io.vertx.core.json.JsonObject;
 
 public class RequestAnonymizer {
@@ -11,18 +11,7 @@ public class RequestAnonymizer {
     this.analyzer = analyzer;
   }
 
-  public void redactRequest(JsonObject requestBody, String sessionId) {
-    JsonArray messages = requestBody.getJsonArray("messages");
-    if (messages != null) {
-      for (int i = 0; i < messages.size(); i++) {
-        JsonObject message = messages.getJsonObject(i);
-        String content = message.getString("content");
-
-        if (content != null) {
-          String safeContent = analyzer.anonymizeText(content, sessionId);
-          message.put("content", safeContent);
-        }
-      }
-    }
+  public void redactRequest(JsonObject requestBody, String sessionId, LlmJsonAdapter adapter) {
+    adapter.redactRequest(requestBody, sessionId, analyzer);
   }
 }

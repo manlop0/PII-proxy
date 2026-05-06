@@ -30,7 +30,7 @@ public class StreamingRequestHandler implements LlmRequestHandler {
   @Override
   public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
 
-    anonymizer.redactRequest(requestBody, sessionId);
+    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter());
 
     MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
       .addAll(ctx.request().headers())
@@ -54,7 +54,7 @@ public class StreamingRequestHandler implements LlmRequestHandler {
         return request.send(requestBody.toBuffer());
       })
       .onSuccess(response -> {
-        Handler<Buffer> streamHandler = restorer.createStreamHandler(ctx, sessionId);
+        Handler<Buffer> streamHandler = restorer.createStreamHandler(ctx, sessionId, provider.getAdapter());
         response.handler(streamHandler);
 
         response.endHandler(v -> {

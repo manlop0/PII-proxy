@@ -71,7 +71,17 @@ public class TextAnalyzer {
       matcher.appendReplacement(result, original != null ? original : tag);
     }
     matcher.appendTail(result);
-    return result.toString();
+    String restoredText = result.toString();
+
+    cacheRestoredText(sessionId, restoredText, text);
+
+    return restoredText;
+  }
+
+  public void cacheRestoredText(String sessionId, String restoredText, String rawAnonymizedText) {
+    if (restoredText == null || restoredText.isBlank()) return;
+    String hash = computeHash(restoredText);
+    storage.cacheAnonymizedText(sessionId, hash, rawAnonymizedText);
   }
 
   private List<Span> resolveConflicts(List<Span> sortedSpans) {

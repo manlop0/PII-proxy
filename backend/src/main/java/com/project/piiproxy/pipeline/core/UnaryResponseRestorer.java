@@ -1,7 +1,6 @@
 package com.project.piiproxy.pipeline.core;
 
 import com.project.piiproxy.provider.adapter.LlmJsonAdapter;
-import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
 public class UnaryResponseRestorer {

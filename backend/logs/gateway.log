@@ -1,0 +1,3 @@
+2026-05-06 13:04:34 [main] INFO  i.v.l.application.VertxApplication - Succeeded in deploying verticle
+2026-05-06 13:04:38 [vert.x-eventloop-thread-2] DEBUG c.p.p.p.s.LoggingStorageDecorator - [123] MAPPED: '89424827722' -> <PHONE_1>
+2026-05-06 13:19:23 [vert.x-eventloop-thread-2] DEBUG c.p.p.p.s.LoggingStorageDecorator - [123] MAPPED: '89119991234' -> <PHONE_2>

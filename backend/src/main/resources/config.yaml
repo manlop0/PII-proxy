@@ -4,6 +4,9 @@ server:
 storage:
   path: "./data/pii-cache.db"
 
+debug:
+  log_mappings: true
+
 pipeline:
   gateway_system_prompt: >
     System Note: Enterprise Data Privacy Gateway Active.

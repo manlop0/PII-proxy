@@ -34,6 +34,7 @@ dependencies {
   implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
   implementation("org.mapdb:mapdb:3.0.9")
   implementation("com.google.re2j:re2j:1.8")
+  implementation("ch.qos.logback:logback-classic:1.4.14")
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")

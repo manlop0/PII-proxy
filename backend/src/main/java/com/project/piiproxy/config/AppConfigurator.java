@@ -9,7 +9,10 @@ import com.project.piiproxy.pipeline.filter.regex.CreditCardFilter;
 import com.project.piiproxy.pipeline.filter.regex.EmailFilter;
 import com.project.piiproxy.pipeline.filter.regex.IpAddressFilter;
 import com.project.piiproxy.pipeline.filter.regex.PhoneFilter;
+import com.project.piiproxy.pipeline.state.LoggingStorageDecorator;
 import com.project.piiproxy.pipeline.state.MapDbStorage;
+import com.project.piiproxy.pipeline.state.PiiStorage;
+import com.project.piiproxy.pipeline.state.SessionCleaner;
 import com.project.piiproxy.provider.LlmProvider;
 import com.project.piiproxy.provider.ProviderRegistry;
 import com.project.piiproxy.server.handler.LlmRequestHandler;
@@ -34,8 +37,10 @@ public class AppConfigurator {
 
     JsonObject storageConfig = config.getJsonObject("storage", new JsonObject());
     String dbPath = storageConfig.getString("path", "./data/pii-cache.db");
-    MapDbStorage storage = new MapDbStorage(dbPath);
+    MapDbStorage baseStorage = new MapDbStorage(dbPath);
 
+    JsonObject debugConfig = config.getJsonObject("debug", new JsonObject());
+    boolean logMappings = debugConfig.getBoolean("log_mappings", false);
 
     JsonObject pipelineConfig = config.getJsonObject("pipeline", new JsonObject());
     String systemPrompt = pipelineConfig.getString("gateway_system_prompt", "");
@@ -48,14 +53,17 @@ public class AppConfigurator {
     if (filtersConfig.getBoolean("credit_card", true)) filters.add(new CreditCardFilter());
     if (filtersConfig.getBoolean("ip_address", true)) filters.add(new IpAddressFilter());
 
+    PiiStorage storage = logMappings ? new LoggingStorageDecorator(baseStorage) : baseStorage;
+    SessionCleaner sessionCleaner = baseStorage;
+
     TextAnalyzer analyzer = new TextAnalyzer(storage, filters);
 
     RequestAnonymizer anonymizer = new RequestAnonymizer(analyzer, systemPrompt);
     UnaryResponseRestorer unaryRestorer = new UnaryResponseRestorer(analyzer);
     StreamingResponseRestorer streamingRestorer = new StreamingResponseRestorer(analyzer);
 
-    LlmRequestHandler unaryHandler = new UnaryRequestHandler(anonymizer, unaryRestorer, httpClient, storage);
-    LlmRequestHandler streamingHandler = new StreamingRequestHandler(anonymizer, streamingRestorer, httpClient, storage);
+    LlmRequestHandler unaryHandler = new UnaryRequestHandler(anonymizer, unaryRestorer, httpClient, sessionCleaner);
+    LlmRequestHandler streamingHandler = new StreamingRequestHandler(anonymizer, streamingRestorer, httpClient, sessionCleaner);
 
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());

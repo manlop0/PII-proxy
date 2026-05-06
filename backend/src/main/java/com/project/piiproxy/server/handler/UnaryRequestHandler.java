@@ -49,11 +49,11 @@ public class UnaryRequestHandler implements LlmRequestHandler {
         return request.send(requestBody.toBuffer());
       })
       .onSuccess(response -> {
-      MultiMap responseHeaders = response.headers();
-      responseHeaders
-        .remove("Transfer-Encoding")
-        .remove("Content-Length")
-        .remove("Accept-Encoding");
+        MultiMap responseHeaders = response.headers();
+        responseHeaders
+          .remove("Transfer-Encoding")
+          .remove("Content-Length")
+          .remove("Accept-Encoding");
 
         response.body().onComplete(ar -> {
           if (ar.succeeded()) {
@@ -81,7 +81,7 @@ public class UnaryRequestHandler implements LlmRequestHandler {
 
           cleanupIfEphemeral(sessionId, isEphemeral);
         });
-    }).onFailure(err -> failRequest(ctx, err));
+      }).onFailure(err -> failRequest(ctx, err));
   }
 
   private void cleanupIfEphemeral(String sessionId, boolean isEphemeral) {

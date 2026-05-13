@@ -19,10 +19,12 @@ public class BioOutputAdapter implements ModelOutputAdapter {
 
   private final Map<Integer, String> id2label;
   private final Set<String> ignoredTags;
+  private final Map<String, String> tagMapping;
 
-  public BioOutputAdapter(Map<Integer, String> id2label, Set<String> ignoredTags) {
+  public BioOutputAdapter(Map<Integer, String> id2label, Set<String> ignoredTags, Map<String, String> tagMapping) {
     this.id2label = id2label;
     this.ignoredTags = ignoredTags;
+    this.tagMapping = tagMapping != null ? tagMapping : Collections.emptyMap();
   }
 
   @Override
@@ -65,7 +67,8 @@ public class BioOutputAdapter implements ModelOutputAdapter {
 
   private void flush(List<Span> spans, String text, int start, int end, String entity) {
     if (entity != null && !ignoredTags.contains(entity)) {
-      spans.add(new Span(start, end, PiiType.MODEL, entity, text.substring(start, end)));
+      String mappedEntity = tagMapping.getOrDefault(entity, entity);
+      spans.add(new Span(start, end, PiiType.MODEL, mappedEntity, text.substring(start, end)));
     }
   }
 

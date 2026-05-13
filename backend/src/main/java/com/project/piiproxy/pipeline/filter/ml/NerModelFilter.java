@@ -28,7 +28,7 @@ public class NerModelFilter implements TextFilter, AutoCloseable {
 
   private final Set<String> expectedInputs;
 
-  public NerModelFilter(String modelDir, int intraThreads, Set<String> ignoredTags) throws Exception {
+  public NerModelFilter(String modelDir, int intraThreads, Set<String> ignoredTags, Map<String, String> tagMapping) throws Exception {
     File dir = new File(modelDir);
     if (!dir.exists() || !dir.isDirectory()) {
       throw new IllegalArgumentException("Model directory not found: " + modelDir);
@@ -64,7 +64,7 @@ public class NerModelFilter implements TextFilter, AutoCloseable {
 
     log.info("ML Model Tags -> Active: {}, Ignored: {}", activeTags, disabledTags);
 
-    this.outputAdapter = new BioOutputAdapter(id2label, ignoredTags);
+    this.outputAdapter = new BioOutputAdapter(id2label, ignoredTags, tagMapping);
 
     this.env = OrtEnvironment.getEnvironment();
     OrtSession.SessionOptions options = new OrtSession.SessionOptions();

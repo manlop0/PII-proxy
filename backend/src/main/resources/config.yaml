@@ -22,6 +22,13 @@ ml:
   worker_pool_size: 4
   # Tags produced by the ML model that should be ignored (e.g. MISC, DATE)
   ignored_tags: [ ]
+  
+  # Optional: Map internal ML tags to more descriptive tags for LLM context.
+  # For example, mapping 'LOC' to 'LOCATION' will produce <LOCATION_1> instead of <LOC_1>
+  tag_mapping:
+    LOC: "LOCATION"
+    PER: "PERSON"
+    ORG: "ORGANIZATION"
 
 # Core anonymization pipeline configuration
 pipeline:

@@ -167,8 +167,16 @@ public class AppConfigurator {
     List<String> ignoredTagsList = mlConfig.getJsonArray("ignored_tags", new JsonArray()).getList();
     Set<String> ignoredTags = new HashSet<>(ignoredTagsList);
 
+    Map<String, String> tagMapping = new HashMap<>();
+    JsonObject mappingJson = mlConfig.getJsonObject("tag_mapping");
+    if (mappingJson != null) {
+      for (String key : mappingJson.fieldNames()) {
+        tagMapping.put(key, mappingJson.getString(key));
+      }
+    }
+
     try {
-      return new NerModelFilter(modelDir, mlThreads, ignoredTags);
+      return new NerModelFilter(modelDir, mlThreads, ignoredTags, tagMapping);
     } catch (Exception e) {
       throw new RuntimeException("CRITICAL: Failed to load ML Pipeline from " + modelDir, e);
     }

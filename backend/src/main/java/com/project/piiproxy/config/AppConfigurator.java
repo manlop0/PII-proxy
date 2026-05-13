@@ -163,6 +163,7 @@ public class AppConfigurator {
     JsonObject mlConfig = config.getJsonObject("ml", new JsonObject());
     String modelDir = mlConfig.getString("model_directory");
     int mlThreads = mlConfig.getInteger("intra_op_threads", 1);
+    String adapterType = mlConfig.getString("output_adapter", "BIO");
 
     List<String> ignoredTagsList = mlConfig.getJsonArray("ignored_tags", new JsonArray()).getList();
     Set<String> ignoredTags = new HashSet<>(ignoredTagsList);
@@ -176,7 +177,7 @@ public class AppConfigurator {
     }
 
     try {
-      return new NerModelFilter(modelDir, mlThreads, ignoredTags, tagMapping);
+      return new NerModelFilter(modelDir, mlThreads, ignoredTags, tagMapping, adapterType);
     } catch (Exception e) {
       throw new RuntimeException("CRITICAL: Failed to load ML Pipeline from " + modelDir, e);
     }

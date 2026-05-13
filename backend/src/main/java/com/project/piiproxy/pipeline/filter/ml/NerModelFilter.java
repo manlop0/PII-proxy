@@ -5,7 +5,7 @@ import ai.djl.huggingface.tokenizers.HuggingFaceTokenizer;
 import ai.onnxruntime.*;
 import com.project.piiproxy.pipeline.filter.TextFilter;
 import com.project.piiproxy.pipeline.filter.ml.adapter.ModelOutputAdapter;
-import com.project.piiproxy.pipeline.filter.ml.adapter.BioOutputAdapter;
+import com.project.piiproxy.pipeline.filter.ml.adapter.OutputAdapterFactory;
 import com.project.piiproxy.pipeline.model.Span;
 import io.vertx.core.json.JsonObject;
 import org.slf4j.Logger;
@@ -28,7 +28,7 @@ public class NerModelFilter implements TextFilter, AutoCloseable {
 
   private final Set<String> expectedInputs;
 
-  public NerModelFilter(String modelDir, int intraThreads, Set<String> ignoredTags, Map<String, String> tagMapping) throws Exception {
+  public NerModelFilter(String modelDir, int intraThreads, Set<String> ignoredTags, Map<String, String> tagMapping, String adapterType) throws Exception {
     File dir = new File(modelDir);
     if (!dir.exists() || !dir.isDirectory()) {
       throw new IllegalArgumentException("Model directory not found: " + modelDir);
@@ -43,28 +43,13 @@ public class NerModelFilter implements TextFilter, AutoCloseable {
     JsonObject configJson = new JsonObject(Files.readString(configFile.toPath()));
     Map<Integer, String> id2label = new HashMap<>();
     JsonObject labels = configJson.getJsonObject("id2label");
-    Set<String> allTags = new HashSet<>();
     for (String key : labels.fieldNames()) {
-      String label = labels.getString(key);
-      id2label.put(Integer.parseInt(key), label);
-      if (!"O".equals(label)) {
-        allTags.add(label.replaceFirst("^[BIE]-", ""));
-      }
+      id2label.put(Integer.parseInt(key), labels.getString(key));
     }
 
-    List<String> activeTags = new ArrayList<>();
-    List<String> disabledTags = new ArrayList<>();
-    for (String tag : allTags) {
-      if (ignoredTags.contains(tag)) {
-        disabledTags.add(tag);
-      } else {
-        activeTags.add(tag);
-      }
-    }
+    this.outputAdapter = OutputAdapterFactory.create(adapterType, id2label, ignoredTags, tagMapping);
 
-    log.info("ML Model Tags -> Active: {}, Ignored: {}", activeTags, disabledTags);
-
-    this.outputAdapter = new BioOutputAdapter(id2label, ignoredTags, tagMapping);
+    log.info("ML Model Tags -> Active: {}, Ignored: {}", outputAdapter.getActiveTags(), outputAdapter.getIgnoredTags());
 
     this.env = OrtEnvironment.getEnvironment();
     OrtSession.SessionOptions options = new OrtSession.SessionOptions();

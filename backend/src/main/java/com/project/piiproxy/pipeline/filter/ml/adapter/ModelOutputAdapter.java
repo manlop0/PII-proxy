@@ -11,4 +11,8 @@ public interface ModelOutputAdapter {
 
   List<Span> extractSpans(OrtSession.Result result, CharSpan[] charSpans, String originalText) throws OrtException;
 
+  List<String> getActiveTags();
+
+  List<String> getIgnoredTags();
+
 }

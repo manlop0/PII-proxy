@@ -1,5 +1,7 @@
 package com.project.piiproxy.config;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
 import com.project.piiproxy.pipeline.core.RequestAnonymizer;
 import com.project.piiproxy.pipeline.core.StreamingResponseRestorer;
 import com.project.piiproxy.pipeline.core.TextAnalyzer;
@@ -11,7 +13,6 @@ import com.project.piiproxy.pipeline.filter.regex.EmailFilter;
 import com.project.piiproxy.pipeline.filter.regex.IpAddressFilter;
 import com.project.piiproxy.pipeline.filter.regex.PhoneFilter;
 import com.project.piiproxy.pipeline.model.ConflictStrategy;
-import com.project.piiproxy.pipeline.state.LoggingStorageDecorator;
 import com.project.piiproxy.pipeline.state.MapDbStorage;
 import com.project.piiproxy.pipeline.state.PiiStorage;
 import com.project.piiproxy.pipeline.state.SessionCleaner;
@@ -28,10 +29,15 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.handler.BodyHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
 public class AppConfigurator {
+
+  private static final Logger log = LoggerFactory.getLogger(AppConfigurator.class);
+
   public static Router configureRouter(Vertx vertx, JsonObject config, ProviderRegistry registry) {
 
     HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
@@ -40,8 +46,15 @@ public class AppConfigurator {
     String dbPath = storageConfig.getString("path", "./data/pii-cache.db");
     MapDbStorage baseStorage = new MapDbStorage(dbPath);
 
-    JsonObject debugConfig = config.getJsonObject("debug", new JsonObject());
-    boolean logMappings = debugConfig.getBoolean("log_mappings", false);
+    JsonObject loggingConfig = config.getJsonObject("logging", new JsonObject());
+    String logLevel = loggingConfig.getString("level", "INFO");
+    try {
+      LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+      ch.qos.logback.classic.Logger appLogger = loggerContext.getLogger("com.project.piiproxy");
+      appLogger.setLevel(Level.valueOf(logLevel.toUpperCase()));
+    } catch (Exception e) {
+      log.warn("Could not set log level programmatically. Ensure logback-classic is used.", e);
+    }
 
     JsonObject pipelineConfig = config.getJsonObject("pipeline", new JsonObject());
     String systemPrompt = pipelineConfig.getString("gateway_system_prompt", "");
@@ -51,20 +64,44 @@ public class AppConfigurator {
     try {
       strategy = ConflictStrategy.valueOf(strategyString.toUpperCase());
     } catch (IllegalArgumentException e) {
-      System.err.println("WARN: Invalid conflict_strategy '" + strategyString + "' in config. Defaulting to LONGEST_WINS.");
+      log.warn("Invalid conflict_strategy '{}' in config. Defaulting to LONGEST_WINS.", strategyString);
       strategy = ConflictStrategy.LONGEST_WINS;
     }
 
     List<TextFilter> regexFilters = new ArrayList<>();
     JsonObject filtersConfig = pipelineConfig.getJsonObject("filters", new JsonObject());
 
-    if (filtersConfig.getBoolean("email", true)) regexFilters.add(new EmailFilter());
-    if (filtersConfig.getBoolean("phone", true)) regexFilters.add(new PhoneFilter());
-    if (filtersConfig.getBoolean("credit_card", true)) regexFilters.add(new CreditCardFilter());
-    if (filtersConfig.getBoolean("ip_address", true)) regexFilters.add(new IpAddressFilter());
+    List<String> enabledFilters = new ArrayList<>();
+    List<String> disabledFilters = new ArrayList<>();
 
+    if (filtersConfig.getBoolean("email", true)) {
+      regexFilters.add(new EmailFilter());
+      enabledFilters.add("email");
+    } else {
+      disabledFilters.add("email");
+    }
+    if (filtersConfig.getBoolean("phone", true)) {
+      regexFilters.add(new PhoneFilter());
+      enabledFilters.add("phone");
+    } else {
+      disabledFilters.add("phone");
+    }
+    if (filtersConfig.getBoolean("credit_card", true)) {
+      regexFilters.add(new CreditCardFilter());
+      enabledFilters.add("credit_card");
+    } else {
+      disabledFilters.add("credit_card");
+    }
+    if (filtersConfig.getBoolean("ip_address", true)) {
+      regexFilters.add(new IpAddressFilter());
+      enabledFilters.add("ip_address");
+    } else {
+      disabledFilters.add("ip_address");
+    }
 
-    PiiStorage storage = logMappings ? new LoggingStorageDecorator(baseStorage) : baseStorage;
+    log.info("Regex Filters -> Enabled: {}, Disabled: {}", enabledFilters, disabledFilters);
+
+    PiiStorage storage = baseStorage;
     SessionCleaner sessionCleaner = baseStorage;
 
     TextAnalyzer analyzer = new TextAnalyzer(vertx, storage, regexFilters, strategy);
@@ -106,7 +143,7 @@ public class AppConfigurator {
       if (sessionId == null || sessionId.isBlank()) {
         sessionId = UUID.randomUUID().toString();
         isEphemeral = true;
-        System.out.println("WARN: No Session ID found in Headers or JSON. Using Ephemeral ID: " + sessionId);
+        log.warn("No Session ID found in Headers or JSON. Using Ephemeral ID: {}", sessionId);
       }
 
       String targetPath = ctx.request().path().substring(("/" + provider.getId()).length());

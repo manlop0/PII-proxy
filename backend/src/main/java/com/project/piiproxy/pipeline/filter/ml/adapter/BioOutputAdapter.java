@@ -5,6 +5,8 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import com.project.piiproxy.pipeline.model.PiiType;
 import com.project.piiproxy.pipeline.model.Span;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -12,6 +14,8 @@ import java.util.*;
  * Universal adapter for models using the BIO (Begin, Inside, Outside) tagging scheme.
  */
 public class BioOutputAdapter implements ModelOutputAdapter {
+
+  private static final Logger log = LoggerFactory.getLogger(BioOutputAdapter.class);
 
   private final Map<Integer, String> id2label;
   private final Set<String> ignoredTags;
@@ -36,6 +40,11 @@ public class BioOutputAdapter implements ModelOutputAdapter {
 
       int classIdx = argmax(sequenceLogits[i]);
       String label = id2label.getOrDefault(classIdx, "O");
+
+      if (!"O".equals(label)) {
+        String tokenStr = originalText.substring(charSpans[i].getStart(), charSpans[i].getEnd());
+        log.trace("ML-Adapter Token: '{}' -> Tag: {}", tokenStr, label);
+      }
 
       if (label.startsWith("B-")) {
         flush(spans, originalText, currentStart, currentEnd, currentEntity);

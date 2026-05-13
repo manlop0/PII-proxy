@@ -5,6 +5,7 @@ import com.google.re2j.Pattern;
 public class SessionStreamProcessor {
 
   private final String sessionId;
+  private final String context;
   private final TextAnalyzer analyzer;
 
   private static final Pattern TAG_PATTERN = Pattern.compile("^<[A-Z_]+_\\d+>$");
@@ -17,8 +18,9 @@ public class SessionStreamProcessor {
 
   private final StringBuilder readyToSend = new StringBuilder(128);
 
-  public SessionStreamProcessor(String sessionId, TextAnalyzer analyzer) {
+  public SessionStreamProcessor(String sessionId, String context, TextAnalyzer analyzer) {
     this.sessionId = sessionId;
+    this.context = context;
     this.analyzer = analyzer;
   }
 
@@ -39,7 +41,7 @@ public class SessionStreamProcessor {
           String potentialTag = tagBuffer.toString();
 
           if (TAG_PATTERN.matcher(potentialTag).matches()) {
-            String restored = analyzer.restoreText(potentialTag, sessionId);
+            String restored = analyzer.restoreText(potentialTag, sessionId, context);
             readyToSend.append(restored);
           } else {
             readyToSend.append(potentialTag);

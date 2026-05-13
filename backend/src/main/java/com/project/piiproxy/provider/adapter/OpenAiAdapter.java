@@ -115,7 +115,7 @@ public class OpenAiAdapter implements LlmJsonAdapter {
   private void restoreField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
     String text = obj.getString(field);
     if (text != null && !text.isBlank()) {
-      obj.put(field, analyzer.restoreText(text, sessionId));
+      obj.put(field, analyzer.restoreText(text, sessionId, field));
     }
   }
 }

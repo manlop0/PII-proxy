@@ -10,9 +10,12 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.RequestOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class UnaryRequestHandler implements LlmRequestHandler {
+
+  private static final Logger log = LoggerFactory.getLogger(UnaryRequestHandler.class);
 
   private final RequestAnonymizer anonymizer;
   private final UnaryResponseRestorer restorer;
@@ -28,6 +31,8 @@ public class UnaryRequestHandler implements LlmRequestHandler {
 
   @Override
   public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
+
+    log.debug("Incoming unary request to provider '{}', session '{}', ephemeral: {}", provider.getId(), sessionId, isEphemeral);
 
     anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter()).compose(v -> {
         MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
@@ -67,13 +72,13 @@ public class UnaryRequestHandler implements LlmRequestHandler {
                 .end(responseJson.toBuffer());
 
             } catch (Exception e) {
-              System.err.println("JSON Parse Error: " + e.getMessage());
+              log.error("JSON Parse Error: {}", e.getMessage());
               if (!ctx.response().ended()) {
                 ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response (Parse Error)\"}");
               }
             }
           } else {
-            System.err.println("Failed to read full response body: " + ar.cause().getMessage());
+            log.error("Failed to read full response body: {}", ar.cause().getMessage());
             if (!ctx.response().ended()) {
               ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response (Read Error)\"}");
             }
@@ -86,13 +91,13 @@ public class UnaryRequestHandler implements LlmRequestHandler {
 
   private void cleanupIfEphemeral(String sessionId, boolean isEphemeral) {
     if (isEphemeral) {
-      System.out.println("Cleaning up ephemeral session: " + sessionId);
+      log.debug("Cleaning up ephemeral session: {}", sessionId);
       sessionCleaner.clearSession(sessionId);
     }
   }
 
   private void failRequest(RoutingContext ctx, Throwable err) {
-    System.err.println("Unary upstream error: " + err.getMessage());
+    log.error("Unary upstream error: {}", err.getMessage());
     if (!ctx.response().ended()) {
       ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway\"}");
     }

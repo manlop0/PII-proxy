@@ -12,8 +12,12 @@ import io.vertx.core.http.HttpMethod;
 import io.vertx.core.http.RequestOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class StreamingRequestHandler implements LlmRequestHandler {
+
+  private static final Logger log = LoggerFactory.getLogger(StreamingRequestHandler.class);
 
   private final RequestAnonymizer anonymizer;
   private final StreamingResponseRestorer restorer;
@@ -29,6 +33,8 @@ public class StreamingRequestHandler implements LlmRequestHandler {
 
   @Override
   public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
+
+    log.debug("Incoming streaming request to provider '{}', session '{}', ephemeral: {}", provider.getId(), sessionId, isEphemeral);
 
     anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter()).compose(v -> {
         MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
@@ -63,13 +69,13 @@ public class StreamingRequestHandler implements LlmRequestHandler {
         });
 
         response.exceptionHandler(err -> {
-          System.err.println("Stream interrupted: " + err.getMessage());
+          log.warn("Stream interrupted: {}", err.getMessage());
           if (!ctx.response().ended()) ctx.response().end();
           cleanupIfEphemeral(sessionId, isEphemeral);
         });
       })
       .onFailure(err -> {
-        System.err.println("Streaming error: " + err.getMessage());
+        log.error("Streaming error: {}", err.getMessage());
         if (!ctx.response().ended()) {
           ctx.response().end();
         }
@@ -79,7 +85,7 @@ public class StreamingRequestHandler implements LlmRequestHandler {
 
   private void cleanupIfEphemeral(String sessionId, boolean isEphemeral) {
     if (isEphemeral) {
-      System.out.println("Cleaning up ephemeral session: " + sessionId);
+      log.debug("Cleaning up ephemeral session: {}", sessionId);
       sessionCleaner.clearSession(sessionId);
     }
   }

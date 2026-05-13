@@ -11,6 +11,8 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -20,6 +22,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class TextAnalyzer {
+
+  private static final Logger log = LoggerFactory.getLogger(TextAnalyzer.class);
 
   private final Vertx vertx;
   private final PiiStorage storage;
@@ -40,6 +44,7 @@ public class TextAnalyzer {
     String hash = computeHash(text);
     String cached = storage.getCachedAnonymizedText(sessionId, hash);
     if (cached != null) {
+      log.debug("Cache hit for anonymization in session {}", sessionId);
       return Future.succeededFuture(cached);
     }
 
@@ -51,7 +56,7 @@ public class TextAnalyzer {
           .collect(Collectors.toList());
       })
       .recover(err -> {
-        System.err.println("ML skipped due to error: " + err.getMessage());
+        log.warn("ML skipped due to error: {}", err.getMessage());
         return Future.succeededFuture(new ArrayList<>());
       });
 
@@ -59,10 +64,21 @@ public class TextAnalyzer {
     for (TextFilter filter : filters) {
       regexSpans.addAll(filter.find(text));
     }
+    if (log.isDebugEnabled()) {
+      log.debug("Found Regex spans:{}", regexSpans.isEmpty() ? " none" : regexSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+    }
 
     return mlFuture.map(mlSpans -> {
 
+      if (log.isDebugEnabled()) {
+        log.debug("Received from ML:{}", mlSpans.isEmpty() ? " none" : mlSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+      }
+
       List<Span> resolvedSpans = resolveConflicts(regexSpans, mlSpans, conflictStrategy);
+
+      if (log.isDebugEnabled()) {
+        log.debug("Final spans for replacement:{}", resolvedSpans.isEmpty() ? " none" : resolvedSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+      }
 
       if (resolvedSpans.isEmpty()) {
         storage.cacheAnonymizedText(sessionId, hash, text);
@@ -86,12 +102,18 @@ public class TextAnalyzer {
   }
 
   public String restoreText(String text, String sessionId) {
+    return restoreText(text, sessionId, "unknown");
+  }
+
+  public String restoreText(String text, String sessionId, String context) {
     if (text == null || text.isBlank()) return text;
 
     Matcher matcher = TAG_PATTERN.matcher(text);
     StringBuilder result = new StringBuilder();
 
+    int count = 0;
     while (matcher.find()) {
+      count++;
       String tag = matcher.group();
       String original = storage.getOriginal(sessionId, tag);
 
@@ -100,6 +122,10 @@ public class TextAnalyzer {
     }
     matcher.appendTail(result);
     String restoredText = result.toString();
+
+    if (count > 0) {
+      log.debug("Restored {} tags in '{}' for session {}", count, context, sessionId);
+    }
 
     cacheRestoredText(sessionId, restoredText, text);
 
@@ -133,11 +159,15 @@ public class TextAnalyzer {
 
     List<Span> resolved = new ArrayList<>();
     int currentEnd = -1;
+    Span lastAdded = null;
 
     for (Span span : all) {
       if (span.start() >= currentEnd) {
         resolved.add(span);
         currentEnd = span.end();
+        lastAdded = span;
+      } else if (log.isDebugEnabled()) {
+        log.debug("Conflict resolved (Strategy: {}): Kept {} | Dropped overlapping {}", strategy, lastAdded, span);
       }
     }
     return resolved;

@@ -12,8 +12,12 @@ import io.vertx.core.ThreadingModel;
 import io.vertx.core.VerticleBase;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ProxyServerVerticle extends VerticleBase {
+
+  private static final Logger log = LoggerFactory.getLogger(ProxyServerVerticle.class);
 
   private final ProviderRegistry registry;
 
@@ -34,14 +38,14 @@ public class ProxyServerVerticle extends VerticleBase {
 
     return retriever.getConfig()
       .compose(config -> vertx.executeBlocking(() -> {
-          System.out.println("Loading ONNX Model into Native Memory...");
+          log.info("Loading ONNX Model into Native Memory...");
           return AppConfigurator.createMlFilter(config);
         })
 
         .compose(globalMlFilter -> {
           int workersCount = config.getJsonObject("ml", new JsonObject()).getInteger("worker_pool_size", 4);
 
-          System.out.println("Deploying " + workersCount + " ML Worker Verticles...");
+          log.info("Deploying {} ML Worker Verticles...", workersCount);
 
           DeploymentOptions workerOpts = new DeploymentOptions()
             .setThreadingModel(ThreadingModel.WORKER)
@@ -51,7 +55,7 @@ public class ProxyServerVerticle extends VerticleBase {
         })
 
         .compose(deploymentId -> {
-          System.out.println("Configuring HTTP Router...");
+          log.info("Configuring HTTP Router...");
           Router router = AppConfigurator.configureRouter(vertx, config, registry);
 
           int port = config.getJsonObject("server", new JsonObject()).getInteger("port", 8080);
@@ -59,7 +63,7 @@ public class ProxyServerVerticle extends VerticleBase {
           return vertx.createHttpServer()
             .requestHandler(router)
             .listen(port)
-            .onSuccess(server -> System.out.println("Gateway running on port: " + server.actualPort()));
+            .onSuccess(server -> log.info("Gateway running on port: {}", server.actualPort()));
         }));
   }
 }

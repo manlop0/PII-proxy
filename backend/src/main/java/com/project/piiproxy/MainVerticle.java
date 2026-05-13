@@ -6,8 +6,12 @@ import com.project.piiproxy.provider.ProviderRegistry;
 import com.project.piiproxy.server.ProxyServerVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.VerticleBase;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MainVerticle extends VerticleBase {
+
+  private static final Logger log = LoggerFactory.getLogger(MainVerticle.class);
 
   @Override
   public Future<?> start() {
@@ -17,6 +21,6 @@ public class MainVerticle extends VerticleBase {
     registry.register(new OpenRouterProvider());
 
     return vertx.deployVerticle(new ProxyServerVerticle(registry))
-      .onSuccess(id -> System.out.println("System initialized. Deployment ID: " + id));
+      .onSuccess(id -> log.info("System initialized. Deployment ID: {}", id));
   }
 }

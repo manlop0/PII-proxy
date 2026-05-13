@@ -7,8 +7,12 @@ import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
 
 import java.io.File;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MapDbStorage implements PiiStorage, SessionCleaner {
+
+  private static final Logger log = LoggerFactory.getLogger(MapDbStorage.class);
 
   private final DB db;
   private final HTreeMap<String, String> piiMap;
@@ -56,6 +60,8 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
 
     piiMap.put(storageKey, originalValue);
     reversePiiMap.put(reverseKey, tag);
+
+    log.debug("[{}] MAPPED: '{}' -> {}", sessionId, originalValue, tag);
 
     return tag;
   }

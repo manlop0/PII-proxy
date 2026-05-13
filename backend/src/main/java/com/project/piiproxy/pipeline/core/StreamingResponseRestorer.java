@@ -22,7 +22,7 @@ public class StreamingResponseRestorer {
   public Handler<Buffer> createStreamHandler(RoutingContext ctx, String sessionId, LlmJsonAdapter adapter) {
     Map<String, SessionStreamProcessor> processors = new HashMap<>();
     for (String key : adapter.getStreamProcessorKeys()) {
-      processors.put(key, new SessionStreamProcessor(sessionId, analyzer));
+      processors.put(key, new SessionStreamProcessor(sessionId, key, analyzer));
     }
 
     return RecordParser.newDelimited("\n\n", eventBuffer -> {

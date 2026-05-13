@@ -5,10 +5,14 @@ import com.project.piiproxy.pipeline.model.Span;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
 public class MlWorkerVerticle extends AbstractVerticle {
+
+  private static final Logger log = LoggerFactory.getLogger(MlWorkerVerticle.class);
 
   private final NerModelFilter mlFilter;
 
@@ -34,10 +38,6 @@ public class MlWorkerVerticle extends AbstractVerticle {
           result.add(JsonObject.mapFrom(s));
         }
 
-        // === ДЕБАГ: Смотрим, что воркер отправляет обратно в главный поток ===
-        System.out.println("[DEBUG Worker] Отправка спанов: " + result.encodePrettily());
-        //
-
         msg.reply(result);
 
       } catch (Exception e) {
@@ -45,6 +45,6 @@ public class MlWorkerVerticle extends AbstractVerticle {
       }
     });
 
-    System.out.println("ML Worker Verticle started on thread: " + Thread.currentThread().getName());
+    log.info("ML Worker Verticle started on thread: {}", Thread.currentThread().getName());
   }
 }

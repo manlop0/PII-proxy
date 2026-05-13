@@ -8,6 +8,8 @@ import com.project.piiproxy.pipeline.filter.ml.adapter.ModelOutputAdapter;
 import com.project.piiproxy.pipeline.filter.ml.adapter.BioOutputAdapter;
 import com.project.piiproxy.pipeline.model.Span;
 import io.vertx.core.json.JsonObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.ByteBuffer;
@@ -16,6 +18,8 @@ import java.nio.file.Files;
 import java.util.*;
 
 public class NerModelFilter implements TextFilter, AutoCloseable {
+
+  private static final Logger log = LoggerFactory.getLogger(NerModelFilter.class);
 
   private final HuggingFaceTokenizer tokenizer;
   private final OrtEnvironment env;
@@ -39,9 +43,26 @@ public class NerModelFilter implements TextFilter, AutoCloseable {
     JsonObject configJson = new JsonObject(Files.readString(configFile.toPath()));
     Map<Integer, String> id2label = new HashMap<>();
     JsonObject labels = configJson.getJsonObject("id2label");
+    Set<String> allTags = new HashSet<>();
     for (String key : labels.fieldNames()) {
-      id2label.put(Integer.parseInt(key), labels.getString(key));
+      String label = labels.getString(key);
+      id2label.put(Integer.parseInt(key), label);
+      if (!"O".equals(label)) {
+        allTags.add(label.replaceFirst("^[BIE]-", ""));
+      }
     }
+
+    List<String> activeTags = new ArrayList<>();
+    List<String> disabledTags = new ArrayList<>();
+    for (String tag : allTags) {
+      if (ignoredTags.contains(tag)) {
+        disabledTags.add(tag);
+      } else {
+        activeTags.add(tag);
+      }
+    }
+
+    log.info("ML Model Tags -> Active: {}, Ignored: {}", activeTags, disabledTags);
 
     this.outputAdapter = new BioOutputAdapter(id2label, ignoredTags);
 

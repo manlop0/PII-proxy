@@ -1,3 +1,4 @@
 package com.project.piiproxy.pipeline.model;
 
-public record Span(int start, int end, PiiType type, String value) { }
+public record Span(int start, int end, PiiType type, String rawType, String value) {
+}

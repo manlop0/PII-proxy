@@ -29,24 +29,24 @@ public class UnaryRequestHandler implements LlmRequestHandler {
   @Override
   public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
 
-    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter());
+    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter()).compose(v -> {
+        MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
+          .addAll(ctx.request().headers())
+          .remove("Host")
+          .remove("Content-Length")
+          .remove("Accept-Encoding");
 
-    MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
-      .addAll(ctx.request().headers())
-      .remove("Host")
-      .remove("Content-Length")
-      .remove("Accept-Encoding");
+        RequestOptions options = new RequestOptions()
+          .setMethod(HttpMethod.POST)
+          .setHost(provider.getHost())
+          .setPort(provider.getPort())
+          .setURI(targetPath)
+          .setSsl(provider.getPort() == 443);
 
-    RequestOptions options = new RequestOptions()
-      .setMethod(HttpMethod.POST)
-      .setHost(provider.getHost())
-      .setPort(provider.getPort())
-      .setURI(targetPath)
-      .setSsl(provider.getPort() == 443);
-
-    httpClient.request(options).compose(request -> {
-        request.headers().addAll(requestHeaders);
-        return request.send(requestBody.toBuffer());
+        return httpClient.request(options).compose(request -> {
+          request.headers().addAll(requestHeaders);
+          return request.send(requestBody.toBuffer());
+        });
       })
       .onSuccess(response -> {
         MultiMap responseHeaders = response.headers();

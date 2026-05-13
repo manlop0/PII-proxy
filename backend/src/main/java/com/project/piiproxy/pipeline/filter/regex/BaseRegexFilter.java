@@ -42,7 +42,7 @@ public abstract class BaseRegexFilter implements TextFilter {
       }
 
       if (!value.isEmpty()) {
-        spans.add(new Span(start, end, type, value));
+        spans.add(new Span(start, end, type, type.toString(), value));
       }
     }
     return spans;

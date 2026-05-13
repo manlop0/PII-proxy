@@ -188,3 +188,9 @@ nbdist/
 
 ### Proxy cache data ###
 data/
+
+### Proxy logs data ###
+logs/
+
+### Proxy models directory ###
+models/

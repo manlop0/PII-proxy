@@ -25,11 +25,11 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
     }
 
     this.db = DBMaker.fileDB(dbFile)
-                     .fileMmapEnableIfSupported()
-                     .cleanerHackEnable()
-                     .transactionEnable()
-                     .closeOnJvmShutdown()
-                     .make();
+      .fileMmapEnableIfSupported()
+      .cleanerHackEnable()
+      .transactionEnable()
+      .closeOnJvmShutdown()
+      .make();
 
     this.piiMap = db.hashMap("piiMap", Serializer.STRING, Serializer.STRING).createOrOpen();
     this.reversePiiMap = db.hashMap("reversePiiMap", Serializer.STRING, Serializer.STRING).createOrOpen();
@@ -38,20 +38,20 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
   }
 
   @Override
-  public String saveOriginal(String sessionId, PiiType type, String originalValue) {
+  public String saveOriginal(String sessionId, String type, String originalValue) {
 
-    String reverseKey = sessionId + "_" + type.name() + "_" + originalValue;
+    String reverseKey = sessionId + "_" + type + "_" + originalValue;
     String existingTag = reversePiiMap.get(reverseKey);
     if (existingTag != null) {
       return existingTag;
     }
 
-    String counterKey = sessionId + "_" + type.name();
+    String counterKey = sessionId + "_" + type;
     Integer currentCount = counters.compute(counterKey, (k, oldValue) ->
       (oldValue == null) ? 1 : oldValue + 1
     );
 
-    String tag = "<" + type.name() + "_" + currentCount + ">";
+    String tag = "<" + type + "_" + currentCount + ">";
     String storageKey = sessionId + "_" + tag;
 
     piiMap.put(storageKey, originalValue);

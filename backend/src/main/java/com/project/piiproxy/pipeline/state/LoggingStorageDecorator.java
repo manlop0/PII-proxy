@@ -14,7 +14,7 @@ public class LoggingStorageDecorator implements PiiStorage, SessionCleaner {
   }
 
   @Override
-  public String saveOriginal(String sessionId, PiiType type, String originalValue) {
+  public String saveOriginal(String sessionId, String type, String originalValue) {
     String tag = delegate.saveOriginal(sessionId, type, originalValue);
 
     log.debug("[{}] MAPPED: '{}' -> {}", sessionId, originalValue, tag);

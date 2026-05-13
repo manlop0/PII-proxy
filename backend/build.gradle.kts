@@ -35,6 +35,8 @@ dependencies {
   implementation("org.mapdb:mapdb:3.0.9")
   implementation("com.google.re2j:re2j:1.8")
   implementation("ch.qos.logback:logback-classic:1.4.14")
+  implementation("com.microsoft.onnxruntime:onnxruntime:1.25.1")
+  implementation("ai.djl.huggingface:tokenizers:0.36.0")
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")

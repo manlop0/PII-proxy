@@ -1,14 +1,12 @@
 package com.project.piiproxy.pipeline.model;
 
 public enum PiiType {
-  // Deterministic
+  // Deterministic (Regex tags)
   EMAIL,
   PHONE,
   CREDIT_CARD,
   IP_ADDRESS,
 
-  // Context-dependent
-  PERSON,
-  LOCATION,
-  ORGANIZATION
+  // Model-dependent (Model tags)
+  MODEL
 }

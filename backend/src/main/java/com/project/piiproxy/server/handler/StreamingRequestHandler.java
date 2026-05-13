@@ -30,28 +30,28 @@ public class StreamingRequestHandler implements LlmRequestHandler {
   @Override
   public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
 
-    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter());
+    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter()).compose(v -> {
+        MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
+          .addAll(ctx.request().headers())
+          .remove("Host")
+          .remove("Content-Length")
+          .remove("Accept-Encoding");
 
-    MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
-      .addAll(ctx.request().headers())
-      .remove("Host")
-      .remove("Content-Length")
-      .remove("Accept-Encoding");
+        ctx.response().setChunked(true);
+        ctx.response().putHeader("Content-Type", "text/event-stream");
+        ctx.response().putHeader("Cache-Control", "no-cache");
 
-    ctx.response().setChunked(true);
-    ctx.response().putHeader("Content-Type", "text/event-stream");
-    ctx.response().putHeader("Cache-Control", "no-cache");
+        RequestOptions options = new RequestOptions()
+          .setMethod(HttpMethod.POST)
+          .setHost(provider.getHost())
+          .setPort(provider.getPort())
+          .setURI(targetPath)
+          .setSsl(provider.getPort() == 443);
 
-    RequestOptions options = new RequestOptions()
-      .setMethod(HttpMethod.POST)
-      .setHost(provider.getHost())
-      .setPort(provider.getPort())
-      .setURI(targetPath)
-      .setSsl(provider.getPort() == 443);
-
-    httpClient.request(options).compose(request -> {
-        request.headers().addAll(requestHeaders);
-        return request.send(requestBody.toBuffer());
+        return httpClient.request(options).compose(request -> {
+          request.headers().addAll(requestHeaders);
+          return request.send(requestBody.toBuffer());
+        });
       })
       .onSuccess(response -> {
         Handler<Buffer> streamHandler = restorer.createStreamHandler(ctx, sessionId, provider.getAdapter());

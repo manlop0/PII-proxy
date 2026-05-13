@@ -7,6 +7,12 @@ storage:
 debug:
   log_mappings: true
 
+ml:
+  model_directory: "./models/Babelscape"
+  intra_op_threads: 1
+  worker_pool_size: 4
+  ignored_tags: [ ]
+
 pipeline:
   gateway_system_prompt: >
     System Note: Enterprise Data Privacy Gateway Active.
@@ -16,6 +22,12 @@ pipeline:
     Interact with them naturally, logically, and empathetically as concrete entities, NOT as placeholders or templates.
     Do NOT mention that the data is masked or anonymized.
     Always output these exact tags when referring to these entities in your reasoning and final response..
+
+  # Strategy for resolving overlapping spans between regex and ML filters.
+  # Available options:
+  # - REGEX_PRIORITY: Regex matches always override ML predictions if they overlap.
+  # - LONGEST_WINS: The longest matched span wins, regardless of its source.
+  conflict_strategy: "REGEX_PRIORITY"
 
   filters:
     email: true

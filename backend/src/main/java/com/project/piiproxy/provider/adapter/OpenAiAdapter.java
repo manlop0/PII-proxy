@@ -2,26 +2,33 @@ package com.project.piiproxy.provider.adapter;
 
 import com.project.piiproxy.pipeline.core.SessionStreamProcessor;
 import com.project.piiproxy.pipeline.core.TextAnalyzer;
-import io.vertx.core.json.Json;
+import io.vertx.core.Future;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class OpenAiAdapter implements LlmJsonAdapter {
 
   @Override
-  public void redactRequest(JsonObject requestBody, String sessionId, TextAnalyzer analyzer) {
+  public Future<Void> redactRequest(JsonObject requestBody, String sessionId, TextAnalyzer analyzer) {
     JsonArray messages = requestBody.getJsonArray("messages");
-    if (messages == null) return;
+    if (messages == null || messages.isEmpty()) {
+      return Future.succeededFuture();
+    }
+
+    List<Future<Void>> futures = new ArrayList<>();
 
     for (int i = 0; i < messages.size(); i++) {
       JsonObject message = messages.getJsonObject(i);
-      redactField(message, "content", sessionId, analyzer);
-      redactField(message, "reasoning", sessionId, analyzer);
-      redactField(message, "thought", sessionId, analyzer);
+      futures.add(redactField(message, "content", sessionId, analyzer));
+      futures.add(redactField(message, "reasoning", sessionId, analyzer));
+      futures.add(redactField(message, "thought", sessionId, analyzer));
     }
+
+    return Future.all(futures).mapEmpty();
   }
 
   @Override
@@ -95,11 +102,14 @@ public class OpenAiAdapter implements LlmJsonAdapter {
     }
   }
 
-  private void redactField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
+  private Future<Void> redactField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
     String text = obj.getString(field);
     if (text != null && !text.isBlank()) {
-      obj.put(field, analyzer.anonymizeText(text, sessionId));
+      return analyzer.anonymizeText(text, sessionId)
+        .onSuccess(safeText -> obj.put(field, safeText))
+        .mapEmpty();
     }
+    return Future.succeededFuture();
   }
 
   private void restoreField(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {

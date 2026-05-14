@@ -1,6 +1,8 @@
 package com.project.piiproxy.pipeline.filter.ml.adapter;
 
+import ai.djl.huggingface.tokenizers.Encoding;
 import ai.djl.huggingface.tokenizers.jni.CharSpan;
+import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 import com.project.piiproxy.pipeline.model.PiiType;
@@ -8,6 +10,7 @@ import com.project.piiproxy.pipeline.model.Span;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.FloatBuffer;
 import java.util.*;
 
 /**
@@ -47,16 +50,36 @@ public class SimpleOutputAdapter implements ModelOutputAdapter {
   }
 
   @Override
-  public List<Span> extractSpans(OrtSession.Result result, CharSpan[] charSpans, String originalText) throws OrtException {
-    float[][][] logits = (float[][][]) result.get(0).getValue();
-    float[][] sequenceLogits = logits[0];
+  public List<List<Span>> extractBatchSpans(OrtSession.Result result, Encoding[] encodings, List<String> originalTexts) throws OrtException {
+    OnnxTensor tensor = (OnnxTensor) result.get(0);
+    FloatBuffer buffer = tensor.getFloatBuffer();
+    long[] shape = tensor.getInfo().getShape();
 
+    int batchSize = (int) shape[0];
+    int seqLen = (int) shape[1];
+    int numLabels = (int) shape[2];
+
+    List<List<Span>> batchSpans = new ArrayList<>(batchSize);
+
+    for (int b = 0; b < batchSize; b++) {
+      CharSpan[] charSpans = encodings[b].getCharTokenSpans();
+      String originalText = originalTexts.get(b);
+      batchSpans.add(processSequence(buffer, b, seqLen, numLabels, charSpans, originalText));
+    }
+
+    return batchSpans;
+  }
+
+  private List<Span> processSequence(FloatBuffer buffer, int batchIdx, int seqLen, int numLabels, CharSpan[] charSpans, String originalText) {
     List<Span> spans = new ArrayList<>();
 
-    for (int i = 0; i < sequenceLogits.length; i++) {
-      if (charSpans[i] == null) continue;
+    int batchOffset = batchIdx * seqLen * numLabels;
 
-      int classIdx = argmax(sequenceLogits[i]);
+    for (int i = 0; i < seqLen; i++) {
+      if (i >= charSpans.length || charSpans[i] == null) continue;
+
+      int tokenOffset = batchOffset + (i * numLabels);
+      int classIdx = argmax(buffer, tokenOffset, numLabels);
       String label = id2label.getOrDefault(classIdx, "O");
 
       if (!"O".equals(label)) {
@@ -72,10 +95,15 @@ public class SimpleOutputAdapter implements ModelOutputAdapter {
     return spans;
   }
 
-  private int argmax(float[] array) {
+  private int argmax(FloatBuffer buffer, int tokenOffset, int numLabels) {
     int maxIdx = 0;
-    for (int i = 1; i < array.length; i++) {
-      if (array[i] > array[maxIdx]) maxIdx = i;
+    float maxVal = buffer.get(tokenOffset);
+    for (int i = 1; i < numLabels; i++) {
+      float val = buffer.get(tokenOffset + i);
+      if (val > maxVal) {
+        maxIdx = i;
+        maxVal = val;
+      }
     }
     return maxIdx;
   }

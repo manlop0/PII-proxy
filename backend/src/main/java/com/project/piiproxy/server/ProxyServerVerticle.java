@@ -1,7 +1,7 @@
 package com.project.piiproxy.server;
 
 import com.project.piiproxy.config.AppConfigurator;
-import com.project.piiproxy.pipeline.worker.MlWorkerVerticle;
+import com.project.piiproxy.pipeline.worker.MlBatchAggregatorVerticle;
 import com.project.piiproxy.provider.ProviderRegistry;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigRetrieverOptions;
@@ -43,15 +43,13 @@ public class ProxyServerVerticle extends VerticleBase {
         })
 
         .compose(globalMlFilter -> {
-          int workersCount = config.getJsonObject("ml", new JsonObject()).getInteger("worker_pool_size", 4);
+          JsonObject mlConfig = config.getJsonObject("ml", new JsonObject());
+          int batchSize = mlConfig.getInteger("batch_size", 16);
+          int batchTimeout = mlConfig.getInteger("batch_timeout_ms", 10);
 
-          log.info("Deploying {} ML Worker Verticles...", workersCount);
+          log.info("Deploying ML Aggregator Verticle (Batch Size: {}, Timeout: {}ms)...", batchSize, batchTimeout);
 
-          DeploymentOptions workerOpts = new DeploymentOptions()
-            .setThreadingModel(ThreadingModel.WORKER)
-            .setInstances(workersCount);
-
-          return vertx.deployVerticle(() -> new MlWorkerVerticle(globalMlFilter), workerOpts);
+          return vertx.deployVerticle(new MlBatchAggregatorVerticle(globalMlFilter, batchSize, batchTimeout));
         })
 
         .compose(deploymentId -> {

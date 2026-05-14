@@ -18,8 +18,10 @@ ml:
   model_directory: "./models/Babelscape"
   # Number of threads used to parallelize the execution within nodes
   intra_op_threads: 1
-  # Number of background worker verticles for ML inference
-  worker_pool_size: 4
+  # Maximum number of texts to process in a single batch
+  batch_size: 16
+  # Maximum time to wait for a batch to fill up before processing (in milliseconds)
+  batch_timeout_ms: 10
   # Scheme used by the model for sequence labeling. 
   # Supported built-in: "BIO", "SIMPLE" or use a Fully Qualified Class Name (FQCN) for custom adapters.
   output_adapter: "BIO"

@@ -72,14 +72,15 @@ public class BioOutputAdapter implements ModelOutputAdapter {
 
     for (int b = 0; b < batchSize; b++) {
       CharSpan[] charSpans = encodings[b].getCharTokenSpans();
+      String[] tokens = encodings[b].getTokens();
       String originalText = originalTexts.get(b);
-      batchSpans.add(processSequence(buffer, b, seqLen, numLabels, charSpans, originalText));
+      batchSpans.add(processSequence(buffer, b, seqLen, numLabels, charSpans, tokens, originalText));
     }
 
     return batchSpans;
   }
 
-  private List<Span> processSequence(FloatBuffer buffer, int batchIdx, int seqLen, int numLabels, CharSpan[] charSpans, String originalText) {
+  private List<Span> processSequence(FloatBuffer buffer, int batchIdx, int seqLen, int numLabels, CharSpan[] charSpans, String[] tokens, String originalText) {
     List<Span> spans = new ArrayList<>();
     String currentEntity = null;
     int currentStart = -1;
@@ -107,6 +108,8 @@ public class BioOutputAdapter implements ModelOutputAdapter {
         currentEnd = charSpans[i].getEnd();
       } else if (label.startsWith("I-") && currentEntity != null && label.endsWith(currentEntity)) {
         currentEnd = charSpans[i].getEnd();
+      } else if (currentEntity != null && i < tokens.length && isContinuationToken(tokens[i])) {
+        currentEnd = charSpans[i].getEnd();
       } else {
         flush(spans, originalText, currentStart, currentEnd, currentEntity);
         currentEntity = null;
@@ -114,6 +117,10 @@ public class BioOutputAdapter implements ModelOutputAdapter {
     }
     flush(spans, originalText, currentStart, currentEnd, currentEntity);
     return spans;
+  }
+
+  private boolean isContinuationToken(String token) {
+    return token != null && token.startsWith("##");
   }
 
   private void flush(List<Span> spans, String text, int start, int end, String entity) {

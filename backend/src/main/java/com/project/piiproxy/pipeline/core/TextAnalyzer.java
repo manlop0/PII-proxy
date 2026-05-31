@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -85,14 +86,19 @@ public class TextAnalyzer {
         return text;
       }
 
+      resolvedSpans.sort(Comparator.comparingInt(Span::start));
+      List<String> tags = new ArrayList<>(resolvedSpans.size());
+      for (Span span : resolvedSpans) {
+        String tagType = span.type() == PiiType.MODEL ? span.rawType() : span.type().name();
+        tags.add(storage.saveOriginal(sessionId, tagType, span.value()));
+      }
+
       resolvedSpans.sort((s1, s2) -> Integer.compare(s2.start(), s1.start()));
       StringBuilder sb = new StringBuilder(text);
 
-      for (Span span : resolvedSpans) {
-        String tagType = span.type() == PiiType.MODEL ? span.rawType() : span.type().name();
-
-        String tag = storage.saveOriginal(sessionId, tagType, span.value());
-        sb.replace(span.start(), span.end(), tag);
+      for (int i = 0; i < resolvedSpans.size(); i++) {
+        Span span = resolvedSpans.get(i);
+        sb.replace(span.start(), span.end(), tags.get(i));
       }
 
       String result = sb.toString();

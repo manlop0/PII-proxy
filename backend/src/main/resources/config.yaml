@@ -22,12 +22,12 @@ ml:
   batch_size: 16
   # Maximum time to wait for a batch to fill up before processing (in milliseconds)
   batch_timeout_ms: 10
-  # Scheme used by the model for sequence labeling. 
+  # Scheme used by the model for sequence labeling.
   # Supported built-in: "BIO", "SIMPLE" or use a Fully Qualified Class Name (FQCN) for custom adapters.
   output_adapter: "BIO"
   # Tags produced by the ML model that should be ignored (e.g. MISC, DATE)
   ignored_tags: [ ]
-  
+
   # Optional: Map internal ML tags to more descriptive tags for LLM context.
   # For example, mapping 'LOC' to 'LOCATION' will produce <LOCATION_1> instead of <LOC_1>
   tag_mapping:
@@ -37,6 +37,21 @@ ml:
 
 # Core anonymization pipeline configuration
 pipeline:
+  # Smart entity resolution (Fuzzy Matching)
+  # This feature groups morphological variations or typos of the same entity under a single tag.
+  entity_resolution:
+    enabled: true
+    # Supported algorithms:
+    # - "jaro-winkler": Best for names and morphological changes (prioritizes prefix matches).
+    # - "exact": Disables fuzzy matching, requires 100% exact string match.
+    algorithm: "jaro-winkler"
+    # Similarity threshold (0.0 to 1.0). Higher means stricter matching. 0.88 is a good balance for names.
+    threshold: 0.88
+    # Only these entity types will undergo fuzzy matching.
+    # All other types (PHONE, EMAIL, IP_ADDRESS, CREDIT_CARD) will strictly require exact matches
+    # to prevent dangerous merging of distinct identifiers.
+    fuzzy_types: ["PERSON", "LOCATION", "ORGANIZATION"]
+
   # System prompt injected to instruct the LLM on how to handle the <TAGS>
   gateway_system_prompt: >
     System Note: Enterprise Data Privacy Gateway Active.

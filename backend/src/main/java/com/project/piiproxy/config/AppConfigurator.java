@@ -16,6 +16,9 @@ import com.project.piiproxy.pipeline.model.ConflictStrategy;
 import com.project.piiproxy.pipeline.state.MapDbStorage;
 import com.project.piiproxy.pipeline.state.PiiStorage;
 import com.project.piiproxy.pipeline.state.SessionCleaner;
+import com.project.piiproxy.pipeline.state.resolution.EntityResolutionStrategy;
+import com.project.piiproxy.pipeline.state.resolution.ExactMatchResolutionStrategy;
+import com.project.piiproxy.pipeline.state.resolution.ResolutionStrategyFactory;
 import com.project.piiproxy.provider.LlmProvider;
 import com.project.piiproxy.provider.ProviderRegistry;
 import com.project.piiproxy.server.handler.LlmRequestHandler;
@@ -42,9 +45,29 @@ public class AppConfigurator {
 
     HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
 
+    JsonObject pipelineConfig = config.getJsonObject("pipeline", new JsonObject());
+
+    JsonObject resolutionConfig = pipelineConfig.getJsonObject("entity_resolution", new JsonObject());
+    boolean resolutionEnabled = resolutionConfig.getBoolean("enabled", true);
+    EntityResolutionStrategy resolutionStrategy;
+
+    if (resolutionEnabled) {
+      String algo = resolutionConfig.getString("algorithm", "jaro-winkler");
+      double threshold = resolutionConfig.getDouble("threshold", 0.88);
+      
+      List<String> typesList = resolutionConfig.getJsonArray("fuzzy_types", new JsonArray()).getList();
+      Set<String> fuzzyTypes = new HashSet<>(typesList);
+      
+      resolutionStrategy = ResolutionStrategyFactory.create(algo, threshold, fuzzyTypes);
+      log.info("Entity Resolution Strategy: {} (threshold: {}, fuzzy_types: {})", algo, threshold, fuzzyTypes);
+    } else {
+      resolutionStrategy = new ExactMatchResolutionStrategy();
+      log.info("Entity Resolution Strategy: Exact Match Only (Fuzzy matching disabled)");
+    }
+
     JsonObject storageConfig = config.getJsonObject("storage", new JsonObject());
     String dbPath = storageConfig.getString("path", "./data/pii-cache.db");
-    MapDbStorage baseStorage = new MapDbStorage(dbPath);
+    MapDbStorage baseStorage = new MapDbStorage(dbPath, resolutionStrategy);
 
     JsonObject loggingConfig = config.getJsonObject("logging", new JsonObject());
     String logLevel = loggingConfig.getString("level", "INFO");
@@ -56,7 +79,6 @@ public class AppConfigurator {
       log.warn("Could not set log level programmatically. Ensure logback-classic is used.", e);
     }
 
-    JsonObject pipelineConfig = config.getJsonObject("pipeline", new JsonObject());
     String systemPrompt = pipelineConfig.getString("gateway_system_prompt", "");
     String strategyString = pipelineConfig.getString("conflict_strategy", "LONGEST_WINS");
 

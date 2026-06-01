@@ -41,9 +41,12 @@ public class OpenAiAdapter implements LlmJsonCodec {
         restoreField(message, "content", sessionId, analyzer);
         restoreField(message, "reasoning", sessionId, analyzer);
 
-        JsonObject reasoning_details = message.getJsonArray("reasoning_details").getJsonObject(0);
-        if (reasoning_details != null) {
-          restoreField(reasoning_details, "text", sessionId, analyzer);
+        JsonArray reasoningDetails = message.getJsonArray("reasoning_details");
+        if (reasoningDetails != null && !reasoningDetails.isEmpty()) {
+          JsonObject reasoning_details = reasoningDetails.getJsonObject(0);
+          if (reasoning_details != null) {
+            restoreField(reasoning_details, "text", sessionId, analyzer);
+          }
         }
       }
     }

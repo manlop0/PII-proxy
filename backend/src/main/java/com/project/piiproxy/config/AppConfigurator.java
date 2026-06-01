@@ -26,11 +26,8 @@ import io.vertx.ext.web.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Application bootstrap and dependency-injection container.
@@ -41,6 +38,10 @@ public class AppConfigurator {
   private static final Logger log = LoggerFactory.getLogger(AppConfigurator.class);
 
   public static Router configureRouter(Vertx vertx, JsonObject config, ProviderRegistry registry) {
+    return configureRouter(vertx, config, registry, null);
+  }
+
+  public static Router configureRouter(Vertx vertx, JsonObject config, ProviderRegistry registry, Consumer<PiiStorage> storageSink) {
 
     HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
 
@@ -55,6 +56,9 @@ public class AppConfigurator {
     List<TextFilter> regexFilters = new FilterChainFactory().build(pipelineConfig);
 
     MapDbStorage baseStorage = buildStorage(config, resolutionStrategy);
+    if (storageSink != null) {
+      storageSink.accept(baseStorage);
+    }
     PiiStorage storage = baseStorage;
     SessionCleaner sessionCleaner = baseStorage;
 

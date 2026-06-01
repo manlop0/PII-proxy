@@ -42,6 +42,16 @@ public class ProviderRouter {
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
 
+    router.get("/health").handler(ctx ->
+      ctx.response().setStatusCode(200)
+        .putHeader("Content-Type", "application/json")
+        .end("{\"status\": \"UP\"}"));
+
+    router.get("/ready").handler(ctx ->
+      ctx.response().setStatusCode(200)
+        .putHeader("Content-Type", "application/json")
+        .end("{\"status\": \"READY\"}"));
+
     router.post("/:provider/*").handler(this::handle);
     return router;
   }

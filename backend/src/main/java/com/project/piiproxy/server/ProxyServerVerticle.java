@@ -1,6 +1,7 @@
 package com.project.piiproxy.server;
 
 import com.project.piiproxy.config.AppConfigurator;
+import com.project.piiproxy.pipeline.state.PiiStorage;
 import com.project.piiproxy.pipeline.worker.MlBatchAggregatorVerticle;
 import com.project.piiproxy.provider.ProviderRegistry;
 import io.vertx.config.ConfigRetriever;
@@ -8,6 +9,7 @@ import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
 import io.vertx.core.Future;
 import io.vertx.core.VerticleBase;
+import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import org.slf4j.Logger;
@@ -19,6 +21,8 @@ public class ProxyServerVerticle extends VerticleBase {
   private static final Logger log = LoggerFactory.getLogger(ProxyServerVerticle.class);
 
   private final ProviderRegistry registry;
+  private HttpServer server;
+  private PiiStorage storage;
 
   public ProxyServerVerticle(ProviderRegistry registry) {
     this.registry = registry;
@@ -53,14 +57,36 @@ public class ProxyServerVerticle extends VerticleBase {
 
         .compose(deploymentId -> {
           log.info("Configuring HTTP Router...");
-          Router router = AppConfigurator.configureRouter(vertx, config, registry);
+          Router router = AppConfigurator.configureRouter(vertx, config, registry, s -> this.storage = s);
 
           int port = config.getJsonObject("server", new JsonObject()).getInteger("port", 8080);
 
           return vertx.createHttpServer()
             .requestHandler(router)
             .listen(port)
-            .onSuccess(server -> log.info("Gateway running on port: {}", server.actualPort()));
+            .onSuccess(s -> {
+              this.server = s;
+              log.info("Gateway running on port: {}", s.actualPort());
+            });
         }));
+  }
+
+  @Override
+  public Future<?> stop() {
+    Future<?> chain = server != null
+      ? server.close()
+      : Future.succeededFuture();
+
+    if (storage != null) {
+      chain = chain.onComplete(v -> {
+        try {
+          storage.close();
+        } catch (Exception e) {
+          log.error("Error closing PII storage", e);
+        }
+      });
+    }
+
+    return chain;
   }
 }

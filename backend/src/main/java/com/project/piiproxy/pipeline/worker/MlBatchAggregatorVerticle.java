@@ -4,6 +4,8 @@ import com.project.piiproxy.pipeline.BusAddresses;
 import com.project.piiproxy.pipeline.filter.ml.NerModelFilter;
 import com.project.piiproxy.pipeline.model.Span;
 import io.vertx.core.AbstractVerticle;
+import io.vertx.core.Future;
+import io.vertx.core.Promise;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -27,6 +29,7 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
 
   private List<Message<String>> currentBatch = new ArrayList<>();
   private long timerId = -1;
+  private Promise<Void> currentFlush;
 
   public MlBatchAggregatorVerticle(NerModelFilter mlFilter, int batchSize, int batchTimeoutMs) {
     this.mlFilter = mlFilter;
@@ -71,6 +74,9 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
     List<Message<String>> batchToProcess = new ArrayList<>(currentBatch);
     currentBatch.clear();
 
+    Promise<Void> flushPromise = Promise.promise();
+    currentFlush = flushPromise;
+
     vertx.executeBlocking(() -> {
       List<String> texts = new ArrayList<>(batchToProcess.size());
       for (Message<String> msg : batchToProcess) {
@@ -94,6 +100,39 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
           msg.fail(500, "ML Inference failed: " + ar.cause().getMessage());
         }
       }
+      currentFlush = null;
+      flushPromise.complete();
     });
+  }
+
+  @Override
+  public void stop(Promise<Void> stopPromise) {
+    log.info("ML Aggregator stopping. Cancelling timer and flushing pending batch ({} messages)...", currentBatch.size());
+
+    if (timerId != -1) {
+      vertx.cancelTimer(timerId);
+      timerId = -1;
+    }
+
+    Runnable closeMlFilter = () -> {
+      try {
+        mlFilter.close();
+        log.info("ML filter resources released.");
+        stopPromise.complete();
+      } catch (Exception e) {
+        log.error("Error closing ML filter", e);
+        stopPromise.fail(e);
+      }
+    };
+
+    if (!currentBatch.isEmpty()) {
+      flushBatch();
+    }
+
+    if (currentFlush != null) {
+      currentFlush.future().onComplete(v -> closeMlFilter.run());
+    } else {
+      closeMlFilter.run();
+    }
   }
 }

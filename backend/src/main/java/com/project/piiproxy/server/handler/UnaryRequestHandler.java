@@ -92,7 +92,10 @@ public class UnaryRequestHandler implements LlmRequestHandler {
 
           cleanupIfEphemeral(sessionId, isEphemeral);
         });
-      }).onFailure(err -> failRequest(ctx, err));
+      }).onFailure(err -> {
+        failRequest(ctx, err);
+        cleanupIfEphemeral(sessionId, isEphemeral);
+      });
   }
 
   private void cleanupIfEphemeral(String sessionId, boolean isEphemeral) {

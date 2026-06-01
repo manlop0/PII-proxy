@@ -6,12 +6,12 @@ import org.mapdb.DB;
 import org.mapdb.DBMaker;
 import org.mapdb.HTreeMap;
 import org.mapdb.Serializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Off-heap PII storage backed by MapDB. Persists original-to-tag and tag-to-original mappings
@@ -124,5 +124,13 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
     counters.keySet().removeIf(key -> key.startsWith(prefix));
     messageCache.keySet().removeIf(key -> key.startsWith(prefix));
     reversePiiMap.keySet().removeIf(key -> key.startsWith(prefix));
+  }
+
+  @Override
+  public void close() {
+    if (!db.isClosed()) {
+      db.close();
+      log.info("MapDB storage closed.");
+    }
   }
 }

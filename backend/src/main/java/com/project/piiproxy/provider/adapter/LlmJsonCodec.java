@@ -15,11 +15,11 @@ import java.util.Map;
 public interface LlmJsonCodec {
   Future<Void> redactRequest(JsonObject requestBody, String sessionId, TextAnalyzer analyzer);
 
-  void restoreUnaryResponse(JsonObject responseBody, String sessionId, TextAnalyzer analyzer);
+  Future<Void> restoreUnaryResponse(JsonObject responseBody, String sessionId, TextAnalyzer analyzer);
 
   List<String> getStreamProcessorKeys();
 
-  void restoreStreamChunk(JsonObject jsonChunk, Map<String, SessionStreamProcessor> processors);
+  Future<Void> restoreStreamChunk(JsonObject jsonChunk, Map<String, SessionStreamProcessor> processors);
 
   void injectGatewaySystemPrompt(JsonObject requestBody, String gatewayPrompt);
 }

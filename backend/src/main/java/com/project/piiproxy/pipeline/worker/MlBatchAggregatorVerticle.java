@@ -26,15 +26,17 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
   private final NerModelFilter mlFilter;
   private final int batchSize;
   private final int batchTimeoutMs;
+  private final int maxQueueSize;
 
   private List<Message<String>> currentBatch = new ArrayList<>();
   private long timerId = -1;
   private Promise<Void> currentFlush;
 
-  public MlBatchAggregatorVerticle(NerModelFilter mlFilter, int batchSize, int batchTimeoutMs) {
+  public MlBatchAggregatorVerticle(NerModelFilter mlFilter, int batchSize, int batchTimeoutMs, int maxQueueSize) {
     this.mlFilter = mlFilter;
     this.batchSize = batchSize;
     this.batchTimeoutMs = batchTimeoutMs;
+    this.maxQueueSize = maxQueueSize;
   }
 
   @Override
@@ -44,6 +46,12 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
 
       if (text == null || text.isBlank()) {
         msg.reply(new JsonArray());
+        return;
+      }
+
+      if (currentBatch.size() >= maxQueueSize) {
+        log.warn("ML queue full ({}). Rejecting request with 503.", maxQueueSize);
+        msg.fail(503, "Service overloaded, retry later");
         return;
       }
 

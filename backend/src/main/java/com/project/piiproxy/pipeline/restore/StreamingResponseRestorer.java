@@ -47,9 +47,14 @@ public class StreamingResponseRestorer {
         try {
           JsonObject json = new JsonObject(jsonStr);
 
-          codec.restoreStreamChunk(json, processors);
-
-          ctx.response().write("data: " + json.encode() + "\n\n");
+          codec.restoreStreamChunk(json, processors)
+            .onComplete(ar -> {
+              if (ar.succeeded()) {
+                ctx.response().write("data: " + json.encode() + "\n\n");
+              } else {
+                ctx.response().write(eventBuffer.appendString("\n\n"));
+              }
+            });
 
         } catch (DecodeException e) {
           ctx.response().write(eventBuffer.appendString("\n\n"));

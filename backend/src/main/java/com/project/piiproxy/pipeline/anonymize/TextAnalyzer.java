@@ -64,47 +64,52 @@ public class TextAnalyzer {
     if (text == null || text.isBlank()) return Future.succeededFuture(text);
 
     String hash = hasher.computeHash(text);
-    String cached = storage.getCachedAnonymizedText(sessionId, hash);
-    if (cached != null) {
-      log.debug("Cache hit for anonymization in session {}", sessionId);
-      return Future.succeededFuture(cached);
-    }
+    return vertx.executeBlocking(() -> {
+      String cached = storage.getCachedAnonymizedText(sessionId, hash);
+      if (cached != null) {
+        log.debug("Cache hit for anonymization in session {}", sessionId);
+        return cached;
+      }
+      return null;
+    }, false).compose(cached -> {
+      if (cached != null) return Future.succeededFuture(cached);
 
-    Future<List<Span>> mlFuture = vertx.eventBus().<JsonArray>request(BusAddresses.ML_NER_ANALYZE, text)
-      .map(reply -> {
-        JsonArray array = reply.body();
-        return array.stream()
-          .map(obj -> ((JsonObject) obj).mapTo(Span.class))
-          .collect(Collectors.toList());
-      })
-      .recover(err -> {
-        log.warn("ML skipped due to error: {}", err.getMessage());
-        return Future.succeededFuture(new ArrayList<>());
-      });
+      Future<List<Span>> mlFuture = vertx.eventBus().<JsonArray>request(BusAddresses.ML_NER_ANALYZE, text)
+        .map(reply -> {
+          JsonArray array = reply.body();
+          return array.stream()
+            .map(obj -> ((JsonObject) obj).mapTo(Span.class))
+            .collect(Collectors.toList());
+        })
+        .recover(err -> {
+          log.warn("ML skipped due to error: {}", err.getMessage());
+          return Future.succeededFuture(new ArrayList<>());
+        });
 
-    List<Span> regexSpans = new ArrayList<>();
-    for (TextFilter filter : filters) {
-      regexSpans.addAll(filter.find(text));
-    }
-    if (log.isDebugEnabled()) {
-      log.debug("Found Regex spans:{}", regexSpans.isEmpty() ? " none" : regexSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
-    }
-
-    return mlFuture.map(mlSpans -> {
-
+      List<Span> regexSpans = new ArrayList<>();
+      for (TextFilter filter : filters) {
+        regexSpans.addAll(filter.find(text));
+      }
       if (log.isDebugEnabled()) {
-        log.debug("Received from ML:{}", mlSpans.isEmpty() ? " none" : mlSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+        log.debug("Found Regex spans:{}", regexSpans.isEmpty() ? " none" : regexSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
       }
 
-      List<Span> resolvedSpans = conflictResolver.resolve(regexSpans, mlSpans, conflictStrategy);
+      return mlFuture.compose(mlSpans -> vertx.executeBlocking(() -> {
 
-      if (log.isDebugEnabled()) {
-        log.debug("Final spans for replacement:{}", resolvedSpans.isEmpty() ? " none" : resolvedSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
-      }
+        if (log.isDebugEnabled()) {
+          log.debug("Received from ML:{}", mlSpans.isEmpty() ? " none" : mlSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+        }
 
-      String result = substitutor.substitute(text, sessionId, resolvedSpans);
-      storage.cacheAnonymizedText(sessionId, hash, result);
-      return result;
+        List<Span> resolvedSpans = conflictResolver.resolve(regexSpans, mlSpans, conflictStrategy);
+
+        if (log.isDebugEnabled()) {
+          log.debug("Final spans for replacement:{}", resolvedSpans.isEmpty() ? " none" : resolvedSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+        }
+
+        String result = substitutor.substitute(text, sessionId, resolvedSpans);
+        storage.cacheAnonymizedText(sessionId, hash, result);
+        return result;
+      }, false));
     });
   }
 
@@ -139,9 +144,22 @@ public class TextAnalyzer {
     return restoredText;
   }
 
+  public Future<String> restoreTextAsync(String text, String sessionId, String context) {
+    if (text == null || text.isBlank()) return Future.succeededFuture(text);
+    return vertx.executeBlocking(() -> restoreText(text, sessionId, context), false);
+  }
+
   public void cacheRestoredText(String sessionId, String restoredText, String rawAnonymizedText) {
     if (restoredText == null || restoredText.isBlank()) return;
     String hash = hasher.computeHash(restoredText);
     storage.cacheAnonymizedText(sessionId, hash, rawAnonymizedText);
+  }
+
+  public Future<Void> cacheRestoredTextAsync(String sessionId, String restoredText, String rawAnonymizedText) {
+    if (restoredText == null || restoredText.isBlank()) return Future.succeededFuture();
+    return vertx.executeBlocking(() -> {
+      cacheRestoredText(sessionId, restoredText, rawAnonymizedText);
+      return null;
+    }, false);
   }
 }

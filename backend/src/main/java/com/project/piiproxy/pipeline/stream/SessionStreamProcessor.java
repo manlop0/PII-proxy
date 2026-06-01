@@ -2,6 +2,10 @@ package com.project.piiproxy.pipeline.stream;
 
 import com.google.re2j.Pattern;
 import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
+import io.vertx.core.Future;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Per-key streaming state machine. Buffers partial tags split across SSE chunks,
@@ -72,6 +76,86 @@ public class SessionStreamProcessor {
     fullRestoredText.append(restoredChunk);
 
     return restoredChunk;
+  }
+
+  public Future<String> processChunkAsync(String chunkText) {
+    if (chunkText == null || chunkText.isEmpty()) return Future.succeededFuture(chunkText);
+
+    fullRawText.append(chunkText);
+
+    readyToSend.setLength(0);
+
+    List<String> detectedTags = new ArrayList<>();
+    List<int[]> tagPositions = new ArrayList<>();
+
+    int len = chunkText.length();
+    for (int i = 0; i < len; i++) {
+      char c = chunkText.charAt(i);
+
+      if (isBuffering) {
+        tagBuffer.append(c);
+        if (c == '>') {
+          String potentialTag = tagBuffer.toString();
+          int startInReady = readyToSend.length();
+
+          if (TAG_PATTERN.matcher(potentialTag).matches()) {
+            detectedTags.add(potentialTag);
+            tagPositions.add(new int[]{startInReady, startInReady + potentialTag.length()});
+            readyToSend.append(potentialTag);
+          } else {
+            readyToSend.append(potentialTag);
+          }
+          tagBuffer.setLength(0);
+          isBuffering = false;
+        } else if (tagBuffer.length() > 50) {
+          readyToSend.append(tagBuffer);
+          tagBuffer.setLength(0);
+          isBuffering = false;
+        }
+      } else {
+        if (c == '<') {
+          isBuffering = true;
+          tagBuffer.append(c);
+        } else {
+          readyToSend.append(c);
+        }
+      }
+    }
+
+    if (detectedTags.isEmpty()) {
+      fullRestoredText.append(readyToSend);
+      return Future.succeededFuture(readyToSend.toString());
+    }
+
+    return restoreAllTags(detectedTags).map(restoredTags -> {
+      StringBuilder finalChunk = new StringBuilder(readyToSend);
+      for (int i = 0; i < detectedTags.size(); i++) {
+        int[] pos = tagPositions.get(i);
+        finalChunk.replace(pos[0], pos[1], restoredTags.get(i));
+      }
+      String restoredChunk = finalChunk.toString();
+      fullRestoredText.append(restoredChunk);
+      return restoredChunk;
+    });
+  }
+
+  private Future<List<String>> restoreAllTags(List<String> tags) {
+    List<Future<String>> futures = new ArrayList<>(tags.size());
+    for (String tag : tags) {
+      futures.add(analyzer.restoreTextAsync(tag, sessionId, context));
+    }
+    return Future.all(futures).map(composite -> {
+      List<String> results = new ArrayList<>(composite.size());
+      for (int i = 0; i < composite.size(); i++) {
+        results.add(composite.resultAt(i));
+      }
+      return results;
+    });
+  }
+
+  public Future<Void> flushCacheAsync() {
+    if (fullRestoredText.isEmpty() || fullRawText.isEmpty()) return Future.succeededFuture();
+    return analyzer.cacheRestoredTextAsync(sessionId, fullRestoredText.toString(), fullRawText.toString());
   }
 
   public void flushCache() {

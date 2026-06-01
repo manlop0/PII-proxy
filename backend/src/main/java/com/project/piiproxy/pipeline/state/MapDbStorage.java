@@ -11,7 +11,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Off-heap PII storage backed by MapDB. Persists original-to-tag and tag-to-original mappings
@@ -27,6 +29,7 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
   private final HTreeMap<String, String> reversePiiMap;
   private final HTreeMap<String, Integer> counters;
   private final HTreeMap<String, String> messageCache;
+  private final HTreeMap<String, Set<String>> typeIndex;
   private final EntityResolutionStrategy resolutionStrategy;
 
   public MapDbStorage(String dbPath, EntityResolutionStrategy resolutionStrategy) {
@@ -49,6 +52,7 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
     this.reversePiiMap = db.hashMap("reversePiiMap", Serializer.STRING, Serializer.STRING).createOrOpen();
     this.counters = db.hashMap("counters", Serializer.STRING, Serializer.INTEGER).createOrOpen();
     this.messageCache = db.hashMap("messageCache", Serializer.STRING, Serializer.STRING).createOrOpen();
+    this.typeIndex = db.hashMap("typeIndex", Serializer.STRING, StringSetSerializer.INSTANCE).createOrOpen();
   }
 
   @Override
@@ -69,6 +73,7 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
         if (resolvedTag != null) {
           log.debug("[{}] FUZZY MATCH: '{}' resolved to existing '{}' -> {}", sessionId, originalValue, resolvedEntity, resolvedTag);
           reversePiiMap.put(exactReverseKey, resolvedTag);
+          addToTypeIndex(sessionId, type, originalValue);
           return resolvedTag;
         }
       }
@@ -84,22 +89,34 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
 
     piiMap.put(storageKey, originalValue);
     reversePiiMap.put(exactReverseKey, tag);
+    addToTypeIndex(sessionId, type, originalValue);
 
     log.debug("[{}] MAPPED: '{}' -> {}", sessionId, originalValue, tag);
 
     return tag;
   }
 
-  private List<String> getExistingEntitiesForType(String sessionId, String type) {
-    String prefix = sessionId + "_" + type + "_";
-    List<String> entities = new ArrayList<>();
-
-    for (String key : reversePiiMap.keySet()) {
-      if (key.startsWith(prefix)) {
-        entities.add(key.substring(prefix.length()));
-      }
+  private void addToTypeIndex(String sessionId, String type, String value) {
+    String typeKey = sessionId + "_" + type;
+    Set<String> existing = typeIndex.get(typeKey);
+    if (existing == null) {
+      Set<String> newSet = new HashSet<>();
+      newSet.add(value);
+      typeIndex.put(typeKey, newSet);
+      return;
     }
-    return entities;
+    if (existing.contains(value)) {
+      return;
+    }
+    Set<String> updated = new HashSet<>(existing.size() + 1);
+    updated.addAll(existing);
+    updated.add(value);
+    typeIndex.put(typeKey, updated);
+  }
+
+  private List<String> getExistingEntitiesForType(String sessionId, String type) {
+    Set<String> indexed = typeIndex.get(sessionId + "_" + type);
+    return indexed != null ? new ArrayList<>(indexed) : new ArrayList<>();
   }
 
   @Override
@@ -124,6 +141,7 @@ public class MapDbStorage implements PiiStorage, SessionCleaner {
     counters.keySet().removeIf(key -> key.startsWith(prefix));
     messageCache.keySet().removeIf(key -> key.startsWith(prefix));
     reversePiiMap.keySet().removeIf(key -> key.startsWith(prefix));
+    typeIndex.keySet().removeIf(key -> key.startsWith(prefix));
   }
 
   @Override

@@ -33,23 +33,25 @@ public class OpenAiAdapter implements LlmJsonCodec {
   }
 
   @Override
-  public void restoreUnaryResponse(JsonObject responseBody, String sessionId, TextAnalyzer analyzer) {
+  public Future<Void> restoreUnaryResponse(JsonObject responseBody, String sessionId, TextAnalyzer analyzer) {
     JsonArray choices = responseBody.getJsonArray("choices");
-    if (choices != null && !choices.isEmpty()) {
-      JsonObject message = choices.getJsonObject(0).getJsonObject("message");
-      if (message != null) {
-        restoreField(message, "content", sessionId, analyzer);
-        restoreField(message, "reasoning", sessionId, analyzer);
+    if (choices == null || choices.isEmpty()) return Future.succeededFuture();
 
-        JsonArray reasoningDetails = message.getJsonArray("reasoning_details");
-        if (reasoningDetails != null && !reasoningDetails.isEmpty()) {
-          JsonObject reasoning_details = reasoningDetails.getJsonObject(0);
-          if (reasoning_details != null) {
-            restoreField(reasoning_details, "text", sessionId, analyzer);
-          }
-        }
+    JsonObject message = choices.getJsonObject(0).getJsonObject("message");
+    if (message == null) return Future.succeededFuture();
+
+    List<Future<Void>> futures = new ArrayList<>();
+    futures.add(restoreFieldAsync(message, "content", sessionId, analyzer));
+    futures.add(restoreFieldAsync(message, "reasoning", sessionId, analyzer));
+
+    JsonArray reasoningDetails = message.getJsonArray("reasoning_details");
+    if (reasoningDetails != null && !reasoningDetails.isEmpty()) {
+      JsonObject reasoning_details = reasoningDetails.getJsonObject(0);
+      if (reasoning_details != null) {
+        futures.add(restoreFieldAsync(reasoning_details, "text", sessionId, analyzer));
       }
     }
+    return Future.all(futures).mapEmpty();
   }
 
   @Override
@@ -58,31 +60,36 @@ public class OpenAiAdapter implements LlmJsonCodec {
   }
 
   @Override
-  public void restoreStreamChunk(JsonObject jsonChunk, Map<String, SessionStreamProcessor> processors) {
+  public Future<Void> restoreStreamChunk(JsonObject jsonChunk, Map<String, SessionStreamProcessor> processors) {
     JsonArray choices = jsonChunk.getJsonArray("choices");
-    if (choices != null && !choices.isEmpty()) {
-      JsonObject delta = choices.getJsonObject(0).getJsonObject("delta");
-      if (delta != null) {
-        if (delta.containsKey("content")) {
-          String safe = processors.get("content").processChunk(delta.getString("content"));
-          delta.put("content", safe);
-        }
-        if (delta.containsKey("reasoning")) {
-          String safe = processors.get("reasoning").processChunk(delta.getString("reasoning"));
-          delta.put("reasoning", safe);
-        }
-        if (delta.containsKey("reasoning_details")) {
-          JsonArray details = delta.getJsonArray("reasoning_details");
-          for (int i = 0; i < details.size(); i++) {
-            JsonObject detail = details.getJsonObject(i);
-            if (detail.containsKey("text")) {
-              String safe = processors.get("reasoning_details").processChunk(detail.getString("text"));
-              detail.put("text", safe);
-            }
-          }
+    if (choices == null || choices.isEmpty()) return Future.succeededFuture();
+
+    JsonObject delta = choices.getJsonObject(0).getJsonObject("delta");
+    if (delta == null) return Future.succeededFuture();
+
+    List<Future<Void>> futures = new ArrayList<>();
+    if (delta.containsKey("content")) {
+      futures.add(processChunkAsync(processors.get("content"), delta, "content"));
+    }
+    if (delta.containsKey("reasoning")) {
+      futures.add(processChunkAsync(processors.get("reasoning"), delta, "reasoning"));
+    }
+    if (delta.containsKey("reasoning_details")) {
+      JsonArray details = delta.getJsonArray("reasoning_details");
+      for (int i = 0; i < details.size(); i++) {
+        JsonObject detail = details.getJsonObject(i);
+        if (detail.containsKey("text")) {
+          futures.add(processChunkAsync(processors.get("reasoning_details"), detail, "text"));
         }
       }
     }
+    return Future.all(futures).mapEmpty();
+  }
+
+  private Future<Void> processChunkAsync(SessionStreamProcessor processor, JsonObject target, String field) {
+    return processor.processChunkAsync(target.getString(field))
+      .onSuccess(safe -> target.put(field, safe))
+      .mapEmpty();
   }
 
   @Override
@@ -121,5 +128,13 @@ public class OpenAiAdapter implements LlmJsonCodec {
     if (text != null && !text.isBlank()) {
       obj.put(field, analyzer.restoreText(text, sessionId, field));
     }
+  }
+
+  private Future<Void> restoreFieldAsync(JsonObject obj, String field, String sessionId, TextAnalyzer analyzer) {
+    String text = obj.getString(field);
+    if (text == null || text.isBlank()) return Future.succeededFuture();
+    return analyzer.restoreTextAsync(text, sessionId, field)
+      .onSuccess(restored -> obj.put(field, restored))
+      .mapEmpty();
   }
 }

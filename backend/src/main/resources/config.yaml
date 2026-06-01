@@ -22,6 +22,8 @@ ml:
   batch_size: 16
   # Maximum time to wait for a batch to fill up before processing (in milliseconds)
   batch_timeout_ms: 10
+  # Maximum number of pending ML requests. When full, new requests are rejected with 503.
+  max_queue_size: 1000
   # Scheme used by the model for sequence labeling.
   # Supported built-in: "BIO", "SIMPLE" or use a Fully Qualified Class Name (FQCN) for custom adapters.
   output_adapter: "BIO"

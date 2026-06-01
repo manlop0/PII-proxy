@@ -70,27 +70,28 @@ public class UnaryRequestHandler implements LlmRequestHandler {
           if (ar.succeeded()) {
             try {
               JsonObject responseJson = ar.result().toJsonObject();
-              provider.getCodec().restoreUnaryResponse(responseJson, sessionId, analyzer);
-
-              ctx.response().headers().addAll(responseHeaders);
-              ctx.response()
-                .setStatusCode(response.statusCode())
-                .end(responseJson.toBuffer());
-
+              provider.getCodec().restoreUnaryResponse(responseJson, sessionId, analyzer)
+                .onComplete(restoreAr -> {
+                  ctx.response().headers().addAll(responseHeaders);
+                  ctx.response()
+                    .setStatusCode(response.statusCode())
+                    .end(responseJson.toBuffer());
+                  cleanupIfEphemeral(sessionId, isEphemeral);
+                });
             } catch (Exception e) {
               log.error("JSON Parse Error: {}", e.getMessage());
               if (!ctx.response().ended()) {
                 ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response (Parse Error)\"}");
               }
+              cleanupIfEphemeral(sessionId, isEphemeral);
             }
           } else {
             log.error("Failed to read full response body: {}", ar.cause().getMessage());
             if (!ctx.response().ended()) {
               ctx.response().setStatusCode(502).end("{\"error\": \"Bad Gateway Response (Read Error)\"}");
             }
+            cleanupIfEphemeral(sessionId, isEphemeral);
           }
-
-          cleanupIfEphemeral(sessionId, isEphemeral);
         });
       }).onFailure(err -> {
         failRequest(ctx, err);

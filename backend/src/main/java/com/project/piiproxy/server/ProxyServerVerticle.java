@@ -49,10 +49,12 @@ public class ProxyServerVerticle extends VerticleBase {
           JsonObject mlConfig = config.getJsonObject("ml", new JsonObject());
           int batchSize = mlConfig.getInteger("batch_size", 16);
           int batchTimeout = mlConfig.getInteger("batch_timeout_ms", 10);
+          int maxQueueSize = mlConfig.getInteger("max_queue_size", 1000);
 
-          log.info("Deploying ML Aggregator Verticle (Batch Size: {}, Timeout: {}ms)...", batchSize, batchTimeout);
+          log.info("Deploying ML Aggregator Verticle (Batch Size: {}, Timeout: {}ms, Max Queue: {})...",
+            batchSize, batchTimeout, maxQueueSize);
 
-          return vertx.deployVerticle(new MlBatchAggregatorVerticle(globalMlFilter, batchSize, batchTimeout));
+          return vertx.deployVerticle(new MlBatchAggregatorVerticle(globalMlFilter, batchSize, batchTimeout, maxQueueSize));
         })
 
         .compose(deploymentId -> {

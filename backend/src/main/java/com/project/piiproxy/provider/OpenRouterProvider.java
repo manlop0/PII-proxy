@@ -1,11 +1,12 @@
 package com.project.piiproxy.provider;
 
-import com.project.piiproxy.provider.adapter.LlmJsonAdapter;
+import com.project.piiproxy.provider.adapter.LlmJsonCodec;
 import com.project.piiproxy.provider.adapter.OpenAiAdapter;
 
-public class OpenRouterProvider implements LlmProvider {
+/** {@link LlmEndpoint} descriptor for openrouter.ai. Reuses the OpenAI-compatible JSON codec. */
+public class OpenRouterProvider implements LlmEndpoint {
 
-  private final LlmJsonAdapter adapter = new OpenAiAdapter();
+  private final LlmJsonCodec codec = new OpenAiAdapter();
 
   @Override
   public String getId() {
@@ -23,7 +24,7 @@ public class OpenRouterProvider implements LlmProvider {
   }
 
   @Override
-  public LlmJsonAdapter getAdapter() {
-    return adapter;
+  public LlmJsonCodec getCodec() {
+    return codec;
   }
 }

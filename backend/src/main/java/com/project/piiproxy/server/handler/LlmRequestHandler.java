@@ -1,6 +1,6 @@
 package com.project.piiproxy.server.handler;
 
-import com.project.piiproxy.provider.LlmProvider;
+import com.project.piiproxy.provider.LlmEndpoint;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.RoutingContext;
 
@@ -16,6 +16,6 @@ public interface LlmRequestHandler {
               JsonObject requestBody,
               String sessionId,
               boolean isEphemeral,
-              LlmProvider provider,
+              LlmEndpoint provider,
               String targetPath);
 }

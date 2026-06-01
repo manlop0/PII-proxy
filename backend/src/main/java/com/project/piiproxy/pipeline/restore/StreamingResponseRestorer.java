@@ -1,6 +1,8 @@
-package com.project.piiproxy.pipeline.core;
+package com.project.piiproxy.pipeline.restore;
 
-import com.project.piiproxy.provider.adapter.LlmJsonAdapter;
+import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
+import com.project.piiproxy.pipeline.stream.SessionStreamProcessor;
+import com.project.piiproxy.provider.adapter.LlmJsonCodec;
 import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.json.DecodeException;
@@ -11,6 +13,10 @@ import io.vertx.ext.web.RoutingContext;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Builds a streaming SSE response handler that re-inserts PII tags on the fly.
+ * Uses Vert.x {@link RecordParser} to split frames and one {@link SessionStreamProcessor} per streamable key.
+ */
 public class StreamingResponseRestorer {
 
   private final TextAnalyzer analyzer;
@@ -19,9 +25,9 @@ public class StreamingResponseRestorer {
     this.analyzer = analyzer;
   }
 
-  public Handler<Buffer> createStreamHandler(RoutingContext ctx, String sessionId, LlmJsonAdapter adapter) {
+  public Handler<Buffer> createStreamHandler(RoutingContext ctx, String sessionId, LlmJsonCodec codec) {
     Map<String, SessionStreamProcessor> processors = new HashMap<>();
-    for (String key : adapter.getStreamProcessorKeys()) {
+    for (String key : codec.getStreamProcessorKeys()) {
       processors.put(key, new SessionStreamProcessor(sessionId, key, analyzer));
     }
 
@@ -41,7 +47,7 @@ public class StreamingResponseRestorer {
         try {
           JsonObject json = new JsonObject(jsonStr);
 
-          adapter.restoreStreamChunk(json, processors);
+          codec.restoreStreamChunk(json, processors);
 
           ctx.response().write("data: " + json.encode() + "\n\n");
 

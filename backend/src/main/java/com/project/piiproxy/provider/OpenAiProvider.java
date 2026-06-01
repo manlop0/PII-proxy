@@ -1,10 +1,11 @@
 package com.project.piiproxy.provider;
 
-import com.project.piiproxy.provider.adapter.LlmJsonAdapter;
+import com.project.piiproxy.provider.adapter.LlmJsonCodec;
 import com.project.piiproxy.provider.adapter.OpenAiAdapter;
 
-public class OpenAiProvider implements LlmProvider {
-  private final LlmJsonAdapter adapter = new OpenAiAdapter();
+/** {@link LlmEndpoint} descriptor for api.openai.com (HTTPS, port 443, OpenAI JSON format). */
+public class OpenAiProvider implements LlmEndpoint {
+  private final LlmJsonCodec codec = new OpenAiAdapter();
 
   @Override
   public String getId() {
@@ -22,7 +23,7 @@ public class OpenAiProvider implements LlmProvider {
   }
 
   @Override
-  public LlmJsonAdapter getAdapter() {
-    return adapter;
+  public LlmJsonCodec getCodec() {
+    return codec;
   }
 }

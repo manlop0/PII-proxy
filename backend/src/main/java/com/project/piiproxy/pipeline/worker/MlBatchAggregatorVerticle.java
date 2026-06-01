@@ -1,5 +1,6 @@
 package com.project.piiproxy.pipeline.worker;
 
+import com.project.piiproxy.pipeline.BusAddresses;
 import com.project.piiproxy.pipeline.filter.ml.NerModelFilter;
 import com.project.piiproxy.pipeline.model.Span;
 import io.vertx.core.AbstractVerticle;
@@ -12,6 +13,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Aggregates concurrent requests into ML inference batches and forwards them to {@link NerModelFilter}.
+ * Deployed as a single Event Loop instance so that Vert.x's Round-Robin dispatch cannot fragment batches.
+ */
 public class MlBatchAggregatorVerticle extends AbstractVerticle {
 
   private static final Logger log = LoggerFactory.getLogger(MlBatchAggregatorVerticle.class);
@@ -31,7 +36,7 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
 
   @Override
   public void start() {
-    vertx.eventBus().<String>consumer("ml.ner.analyze", msg -> {
+    vertx.eventBus().<String>consumer(BusAddresses.ML_NER_ANALYZE, msg -> {
       String text = msg.body();
 
       if (text == null || text.isBlank()) {

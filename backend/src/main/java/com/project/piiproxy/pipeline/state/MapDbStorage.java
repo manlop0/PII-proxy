@@ -1,6 +1,5 @@
 package com.project.piiproxy.pipeline.state;
 
-import com.project.piiproxy.pipeline.model.PiiType;
 import com.project.piiproxy.pipeline.state.resolution.EntityResolutionStrategy;
 import com.project.piiproxy.pipeline.state.resolution.ExactMatchResolutionStrategy;
 import org.mapdb.DB;
@@ -14,6 +13,11 @@ import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Off-heap PII storage backed by MapDB. Persists original-to-tag and tag-to-original mappings
+ * and delegates entity coreference (e.g. matching "John" to "John's") to a pluggable
+ * {@link EntityResolutionStrategy}.
+ */
 public class MapDbStorage implements PiiStorage, SessionCleaner {
 
   private static final Logger log = LoggerFactory.getLogger(MapDbStorage.class);

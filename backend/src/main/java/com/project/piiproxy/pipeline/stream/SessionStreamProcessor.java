@@ -1,7 +1,12 @@
-package com.project.piiproxy.pipeline.core;
+package com.project.piiproxy.pipeline.stream;
 
 import com.google.re2j.Pattern;
+import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
 
+/**
+ * Per-key streaming state machine. Buffers partial tags split across SSE chunks,
+ * restores PII inline, and accumulates the full raw/restored text for response caching.
+ */
 public class SessionStreamProcessor {
 
   private final String sessionId;

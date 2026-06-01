@@ -9,6 +9,7 @@ import io.vertx.core.VerticleBase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Entry-point verticle: registers providers and deploys {@link ProxyServerVerticle}. */
 public class MainVerticle extends VerticleBase {
 
   private static final Logger log = LoggerFactory.getLogger(MainVerticle.class);

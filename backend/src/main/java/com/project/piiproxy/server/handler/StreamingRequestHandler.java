@@ -1,9 +1,9 @@
 package com.project.piiproxy.server.handler;
 
-import com.project.piiproxy.pipeline.core.RequestAnonymizer;
-import com.project.piiproxy.pipeline.core.StreamingResponseRestorer;
+import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
+import com.project.piiproxy.pipeline.restore.StreamingResponseRestorer;
 import com.project.piiproxy.pipeline.state.SessionCleaner;
-import com.project.piiproxy.provider.LlmProvider;
+import com.project.piiproxy.provider.LlmEndpoint;
 import io.vertx.core.Handler;
 import io.vertx.core.MultiMap;
 import io.vertx.core.buffer.Buffer;
@@ -15,28 +15,37 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handles SSE streaming requests: anonymizes the body, opens an upstream SSE channel, and restores chunks as they arrive. */
 public class StreamingRequestHandler implements LlmRequestHandler {
 
   private static final Logger log = LoggerFactory.getLogger(StreamingRequestHandler.class);
 
-  private final RequestAnonymizer anonymizer;
+  private final TextAnalyzer analyzer;
+  private final String gatewaySystemPrompt;
   private final StreamingResponseRestorer restorer;
   private final HttpClient httpClient;
   private final SessionCleaner sessionCleaner;
 
-  public StreamingRequestHandler(RequestAnonymizer anonymizer, StreamingResponseRestorer restorer, HttpClient httpClient, SessionCleaner sessionCleaner) {
-    this.anonymizer = anonymizer;
+  public StreamingRequestHandler(TextAnalyzer analyzer, String gatewaySystemPrompt, StreamingResponseRestorer restorer, HttpClient httpClient, SessionCleaner sessionCleaner) {
+    this.analyzer = analyzer;
+    this.gatewaySystemPrompt = gatewaySystemPrompt;
     this.restorer = restorer;
     this.httpClient = httpClient;
     this.sessionCleaner = sessionCleaner;
   }
 
   @Override
-  public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
+  public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral,               LlmEndpoint provider, String targetPath) {
 
     log.debug("Incoming streaming request to provider '{}', session '{}', ephemeral: {}", provider.getId(), sessionId, isEphemeral);
 
-    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter()).compose(v -> {
+    provider.getCodec().redactRequest(requestBody, sessionId, analyzer)
+      .map(v -> {
+        if (gatewaySystemPrompt != null && !gatewaySystemPrompt.isBlank()) {
+          provider.getCodec().injectGatewaySystemPrompt(requestBody, gatewaySystemPrompt);
+        }
+        return null;
+      }).compose(v -> {
         MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
           .addAll(ctx.request().headers())
           .remove("Host")
@@ -60,7 +69,7 @@ public class StreamingRequestHandler implements LlmRequestHandler {
         });
       })
       .onSuccess(response -> {
-        Handler<Buffer> streamHandler = restorer.createStreamHandler(ctx, sessionId, provider.getAdapter());
+        Handler<Buffer> streamHandler = restorer.createStreamHandler(ctx, sessionId, provider.getCodec());
         response.handler(streamHandler);
 
         response.endHandler(v -> {

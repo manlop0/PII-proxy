@@ -1,7 +1,6 @@
 package com.project.piiproxy.pipeline.state;
 
-import com.project.piiproxy.pipeline.model.PiiType;
-
+/** Contract for session-scoped PII storage: save originals, look up tags, and cache hashed anonymized text. */
 public interface PiiStorage {
   String saveOriginal(String sessionId, String type, String originalValue);
 

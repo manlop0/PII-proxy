@@ -10,6 +10,7 @@ import java.util.List;
 import com.google.re2j.Matcher;
 import com.google.re2j.Pattern;
 
+/** Shared scaffolding for regex-based filters: compiles a RE2/J {@link Pattern} and converts matches into {@link Span}s. */
 public abstract class BaseRegexFilter implements TextFilter {
   private final Pattern pattern;
   private final PiiType type;

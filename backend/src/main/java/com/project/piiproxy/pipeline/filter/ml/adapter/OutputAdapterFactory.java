@@ -3,6 +3,10 @@ package com.project.piiproxy.pipeline.filter.ml.adapter;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Builds a {@link ModelOutputAdapter} by alias ({@code BIO}, {@code SIMPLE}) or by fully-qualified class name,
+ * enabling new model architectures to be plugged in without code changes.
+ */
 public class OutputAdapterFactory {
 
   public static ModelOutputAdapter create(

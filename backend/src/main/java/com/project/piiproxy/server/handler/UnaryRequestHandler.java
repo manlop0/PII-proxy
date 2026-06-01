@@ -1,9 +1,8 @@
 package com.project.piiproxy.server.handler;
 
-import com.project.piiproxy.pipeline.core.RequestAnonymizer;
-import com.project.piiproxy.pipeline.core.UnaryResponseRestorer;
+import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
 import com.project.piiproxy.pipeline.state.SessionCleaner;
-import com.project.piiproxy.provider.LlmProvider;
+import com.project.piiproxy.provider.LlmEndpoint;
 import io.vertx.core.MultiMap;
 import io.vertx.core.http.HttpClient;
 import io.vertx.core.http.HttpMethod;
@@ -13,28 +12,35 @@ import io.vertx.ext.web.RoutingContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** Handles blocking-style requests: anonymizes the body, forwards to the upstream provider, and restores the response. */
 public class UnaryRequestHandler implements LlmRequestHandler {
 
   private static final Logger log = LoggerFactory.getLogger(UnaryRequestHandler.class);
 
-  private final RequestAnonymizer anonymizer;
-  private final UnaryResponseRestorer restorer;
+  private final TextAnalyzer analyzer;
+  private final String gatewaySystemPrompt;
   private final HttpClient httpClient;
   private final SessionCleaner sessionCleaner;
 
-  public UnaryRequestHandler(RequestAnonymizer anonymizer, UnaryResponseRestorer restorer, HttpClient httpClient, SessionCleaner sessionCleaner) {
-    this.anonymizer = anonymizer;
-    this.restorer = restorer;
+  public UnaryRequestHandler(TextAnalyzer analyzer, String gatewaySystemPrompt, HttpClient httpClient, SessionCleaner sessionCleaner) {
+    this.analyzer = analyzer;
+    this.gatewaySystemPrompt = gatewaySystemPrompt;
     this.httpClient = httpClient;
     this.sessionCleaner = sessionCleaner;
   }
 
   @Override
-  public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral, LlmProvider provider, String targetPath) {
+  public void handle(RoutingContext ctx, JsonObject requestBody, String sessionId, boolean isEphemeral,               LlmEndpoint provider, String targetPath) {
 
     log.debug("Incoming unary request to provider '{}', session '{}', ephemeral: {}", provider.getId(), sessionId, isEphemeral);
 
-    anonymizer.redactRequest(requestBody, sessionId, provider.getAdapter()).compose(v -> {
+    provider.getCodec().redactRequest(requestBody, sessionId, analyzer)
+      .map(v -> {
+        if (gatewaySystemPrompt != null && !gatewaySystemPrompt.isBlank()) {
+          provider.getCodec().injectGatewaySystemPrompt(requestBody, gatewaySystemPrompt);
+        }
+        return null;
+      }).compose(v -> {
         MultiMap requestHeaders = MultiMap.caseInsensitiveMultiMap()
           .addAll(ctx.request().headers())
           .remove("Host")
@@ -64,7 +70,7 @@ public class UnaryRequestHandler implements LlmRequestHandler {
           if (ar.succeeded()) {
             try {
               JsonObject responseJson = ar.result().toJsonObject();
-              restorer.restoreResponse(responseJson, sessionId, provider.getAdapter());
+              provider.getCodec().restoreUnaryResponse(responseJson, sessionId, analyzer);
 
               ctx.response().headers().addAll(responseHeaders);
               ctx.response()

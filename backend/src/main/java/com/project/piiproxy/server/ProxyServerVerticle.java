@@ -6,15 +6,14 @@ import com.project.piiproxy.provider.ProviderRegistry;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
-import io.vertx.core.DeploymentOptions;
 import io.vertx.core.Future;
-import io.vertx.core.ThreadingModel;
 import io.vertx.core.VerticleBase;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/** HTTP entry point. Deploys the batch aggregator, configures the router, and dispatches to unary or streaming handlers. */
 public class ProxyServerVerticle extends VerticleBase {
 
   private static final Logger log = LoggerFactory.getLogger(ProxyServerVerticle.class);

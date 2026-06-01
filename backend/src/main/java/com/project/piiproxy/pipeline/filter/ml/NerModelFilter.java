@@ -19,6 +19,11 @@ import java.nio.LongBuffer;
 import java.nio.file.Files;
 import java.util.*;
 
+/**
+ * ML-based PII detector backed by an ONNX model and a HuggingFace tokenizer.
+ * Token IDs are written directly into an off-heap {@link ByteBuffer} (zero-GC) and inference
+ * is dispatched to a worker pool via {@code executeBlocking}.
+ */
 public class NerModelFilter implements AutoCloseable {
 
   private static final Logger log = LoggerFactory.getLogger(NerModelFilter.class);
@@ -108,6 +113,7 @@ public class NerModelFilter implements AutoCloseable {
       Encoding e = encodings[i];
       int offset = i * maxLen;
 
+      // Zero-GC: write token ids, masks and type ids directly into the off-heap LongBuffer views.
       if (idBuffer != null) {
         idBuffer.position(offset).put(e.getIds());
       }

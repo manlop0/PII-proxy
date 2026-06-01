@@ -1,7 +1,7 @@
 package com.project.piiproxy.provider.adapter;
 
-import com.project.piiproxy.pipeline.core.SessionStreamProcessor;
-import com.project.piiproxy.pipeline.core.TextAnalyzer;
+import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
+import com.project.piiproxy.pipeline.stream.SessionStreamProcessor;
 import io.vertx.core.Future;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
@@ -10,7 +10,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class OpenAiAdapter implements LlmJsonAdapter {
+/** {@link LlmJsonCodec} implementation for the OpenAI chat completions schema, including SSE streaming. */
+public class OpenAiAdapter implements LlmJsonCodec {
 
   @Override
   public Future<Void> redactRequest(JsonObject requestBody, String sessionId, TextAnalyzer analyzer) {

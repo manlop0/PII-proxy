@@ -2,6 +2,18 @@
 server:
   port: 8080
 
+# Upstream LLM providers (config-driven, loaded by AppConfigurator)
+# Each provider needs: host, port, and optionally a codec.
+#   codec: "openai" (default) — OpenAI-compatible JSON format (also works for OpenRouter, etc.)
+#   codec: "com.project.piiproxy.provider.codec.MyCustomCodec" — FQCN of a class implementing LlmJsonCodec with a no-arg constructor
+providers:
+  openai:
+    host: api.openai.com
+    port: 443
+  openrouter:
+    host: openrouter.ai
+    port: 443
+
 # Settings for the embedded local database
 storage:
   path: "./data/pii-cache.db"
@@ -52,7 +64,7 @@ pipeline:
     # Only these entity types will undergo fuzzy matching.
     # All other types (PHONE, EMAIL, IP_ADDRESS, CREDIT_CARD) will strictly require exact matches
     # to prevent dangerous merging of distinct identifiers.
-    fuzzy_types: ["PERSON", "LOCATION", "ORGANIZATION"]
+    fuzzy_types: [ "PERSON", "LOCATION", "ORGANIZATION" ]
 
   # System prompt injected to instruct the LLM on how to handle the <TAGS>
   gateway_system_prompt: >

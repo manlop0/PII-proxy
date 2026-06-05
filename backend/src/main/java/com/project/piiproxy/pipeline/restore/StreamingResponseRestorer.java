@@ -2,7 +2,7 @@ package com.project.piiproxy.pipeline.restore;
 
 import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
 import com.project.piiproxy.pipeline.stream.SessionStreamProcessor;
-import com.project.piiproxy.provider.adapter.LlmJsonCodec;
+import com.project.piiproxy.provider.codec.LlmJsonCodec;
 import io.vertx.core.Handler;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.json.DecodeException;

@@ -37,11 +37,8 @@ public class AppConfigurator {
 
   private static final Logger log = LoggerFactory.getLogger(AppConfigurator.class);
 
-  public static Router configureRouter(Vertx vertx, JsonObject config, ProviderRegistry registry) {
-    return configureRouter(vertx, config, registry, null);
-  }
-
-  public static Router configureRouter(Vertx vertx, JsonObject config, ProviderRegistry registry, Consumer<PiiStorage> storageSink) {
+  public static Router configureRouter(Vertx vertx, JsonObject config, Consumer<PiiStorage> storageSink) {
+    ProviderRegistry registry = buildRegistry(config);
 
     HttpClient httpClient = vertx.createHttpClient(new HttpClientOptions().setKeepAlive(true));
 
@@ -115,6 +112,17 @@ public class AppConfigurator {
     JsonObject storageConfig = config.getJsonObject("storage", new JsonObject());
     String dbPath = storageConfig.getString("path", "./data/pii-cache.db");
     return new MapDbStorage(dbPath, resolutionStrategy);
+  }
+
+  private static ProviderRegistry buildRegistry(JsonObject config) {
+    ProviderRegistry registry = new ProviderRegistry();
+    JsonObject providers = config.getJsonObject("providers", new JsonObject());
+    for (String id : providers.fieldNames()) {
+      JsonObject p = providers.getJsonObject(id);
+      registry.register(new ConfigurableProvider(id, p));
+    }
+    log.info("Registered providers: {}", providers.fieldNames());
+    return registry;
   }
 
   public static NerModelFilter createMlFilter(JsonObject config) throws Exception {

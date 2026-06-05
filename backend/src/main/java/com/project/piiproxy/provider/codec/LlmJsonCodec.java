@@ -1,4 +1,4 @@
-package com.project.piiproxy.provider.adapter;
+package com.project.piiproxy.provider.codec;
 
 import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
 import com.project.piiproxy.pipeline.stream.SessionStreamProcessor;

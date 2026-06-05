@@ -3,7 +3,6 @@ package com.project.piiproxy.server;
 import com.project.piiproxy.config.AppConfigurator;
 import com.project.piiproxy.pipeline.state.PiiStorage;
 import com.project.piiproxy.pipeline.worker.MlBatchAggregatorVerticle;
-import com.project.piiproxy.provider.ProviderRegistry;
 import io.vertx.config.ConfigRetriever;
 import io.vertx.config.ConfigRetrieverOptions;
 import io.vertx.config.ConfigStoreOptions;
@@ -20,13 +19,8 @@ public class ProxyServerVerticle extends VerticleBase {
 
   private static final Logger log = LoggerFactory.getLogger(ProxyServerVerticle.class);
 
-  private final ProviderRegistry registry;
   private HttpServer server;
   private PiiStorage storage;
-
-  public ProxyServerVerticle(ProviderRegistry registry) {
-    this.registry = registry;
-  }
 
   @Override
   public Future<?> start() {
@@ -59,7 +53,7 @@ public class ProxyServerVerticle extends VerticleBase {
 
         .compose(deploymentId -> {
           log.info("Configuring HTTP Router...");
-          Router router = AppConfigurator.configureRouter(vertx, config, registry, s -> this.storage = s);
+          Router router = AppConfigurator.configureRouter(vertx, config, s -> this.storage = s);
 
           int port = config.getJsonObject("server", new JsonObject()).getInteger("port", 8080);
 

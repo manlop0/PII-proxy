@@ -63,11 +63,12 @@ public class TextAnalyzer {
   public Future<String> anonymizeText(String text, String sessionId) {
     if (text == null || text.isBlank()) return Future.succeededFuture(text);
 
+    long t0 = System.nanoTime();
     String hash = hasher.computeHash(text);
     return vertx.executeBlocking(() -> {
       String cached = storage.getCachedAnonymizedText(sessionId, hash);
       if (cached != null) {
-        log.debug("Cache hit for anonymization in session {}", sessionId);
+        log.debug("Anonymized session={} in {}µs (cache hit)", sessionId, (System.nanoTime() - t0) / 1_000);
         return cached;
       }
       return null;
@@ -108,6 +109,7 @@ public class TextAnalyzer {
 
         String result = substitutor.substitute(text, sessionId, resolvedSpans);
         storage.cacheAnonymizedText(sessionId, hash, result);
+        log.debug("Anonymized session={} in {}µs", sessionId, (System.nanoTime() - t0) / 1_000);
         return result;
       }, false));
     });
@@ -120,6 +122,7 @@ public class TextAnalyzer {
   public String restoreText(String text, String sessionId, String context) {
     if (text == null || text.isBlank()) return text;
 
+    long t0 = System.nanoTime();
     Matcher matcher = TAG_PATTERN.matcher(text);
     StringBuilder result = new StringBuilder();
 
@@ -136,7 +139,7 @@ public class TextAnalyzer {
     String restoredText = result.toString();
 
     if (count > 0) {
-      log.debug("Restored {} tags in '{}' for session {}", count, context, sessionId);
+      log.debug("Restored {} tags in '{}' for session {} in {}µs", count, context, sessionId, (System.nanoTime() - t0) / 1_000);
     }
 
     cacheRestoredText(sessionId, restoredText, text);

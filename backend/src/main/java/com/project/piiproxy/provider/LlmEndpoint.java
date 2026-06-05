@@ -1,8 +1,10 @@
 package com.project.piiproxy.provider;
 
-import com.project.piiproxy.provider.adapter.LlmJsonCodec;
+import com.project.piiproxy.provider.codec.LlmJsonCodec;
 
-/** Provider descriptor: identity, upstream host/port, and the matching JSON codec. */
+/**
+ * Provider descriptor: identity, upstream host/port, and the matching JSON codec.
+ */
 public interface LlmEndpoint {
 
   String getId();

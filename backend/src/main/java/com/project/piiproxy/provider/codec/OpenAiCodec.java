@@ -1,4 +1,4 @@
-package com.project.piiproxy.provider.adapter;
+package com.project.piiproxy.provider.codec;
 
 import com.project.piiproxy.pipeline.anonymize.TextAnalyzer;
 import com.project.piiproxy.pipeline.stream.SessionStreamProcessor;
@@ -10,8 +10,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** {@link LlmJsonCodec} implementation for the OpenAI chat completions schema, including SSE streaming. */
-public class OpenAiAdapter implements LlmJsonCodec {
+/**
+ * {@link LlmJsonCodec} implementation for the OpenAI chat completions schema, including SSE streaming.
+ */
+public class OpenAiCodec implements LlmJsonCodec {
 
   @Override
   public Future<Void> redactRequest(JsonObject requestBody, String sessionId, TextAnalyzer analyzer) {

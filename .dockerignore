@@ -1,0 +1,12 @@
+backend/build/
+backend/.gradle/
+backend/.idea/
+backend/data/
+backend/models/
+loadtest/
+.git/
+*.md
+*.log
+*.iml
+.vscode/
+.DS_Store

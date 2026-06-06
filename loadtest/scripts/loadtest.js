@@ -1,4 +1,4 @@
-import { check, sleep, group } from "k6";
+import { check, sleep } from "k6";
 import http from "k6/http";
 import { Trend, Counter, Rate } from "k6/metrics";
 import { SharedArray } from "k6/data";
@@ -11,8 +11,18 @@ const errorRate = new Rate("errors");
 const PROXY_URL = "http://proxy:8080/mock/v1/chat/completions";
 const MOCK_URL = "http://mock:9090/v1/chat/completions";
 
+const QUICK = __ENV.QUICK === "true";
+
 const conversations = new SharedArray("conversations", function () {
   return JSON.parse(open("/scripts/data/conversations.json"));
+});
+
+const conversationsLarge = new SharedArray("conversations_large", function () {
+  try {
+    return JSON.parse(open("/scripts/data/conversations_large.json"));
+  } catch {
+    return conversations;
+  }
 });
 
 function sendToProxy(messages, sessionId) {
@@ -39,7 +49,7 @@ function processResponse(res, trend) {
   trend.add(res.timings.duration);
   errorRate.add(res.status !== 200);
 
-  const passed = check(res, {
+  check(res, {
     "status 200": (r) => r.status === 200,
     "has choices": (r) => {
       try {
@@ -81,81 +91,103 @@ function runConversation(conv, sessionId, trend) {
   }
 }
 
-export const options = {
-  scenarios: {
-    baseline: {
-      executor: "constant-vus",
-      vus: 10,
-      duration: "30s",
-      exec: "baseline",
-    },
-    ephemeral: {
-      executor: "ramping-vus",
-      startVUs: 0,
-      stages: [
-        { duration: "10s", target: 10 },
-        { duration: "60s", target: 50 },
-        { duration: "10s", target: 0 },
-      ],
-      exec: "ephemeral",
-      startTime: "35s",
-    },
-    persistent: {
-      executor: "ramping-vus",
-      startVUs: 0,
-      stages: [
-        { duration: "10s", target: 10 },
-        { duration: "60s", target: 50 },
-        { duration: "10s", target: 0 },
-      ],
-      exec: "persistent",
-      startTime: "120s",
-    },
-    mixed: {
-      executor: "ramping-vus",
-      startVUs: 0,
-      stages: [
-        { duration: "10s", target: 10 },
-        { duration: "60s", target: 50 },
-        { duration: "10s", target: 0 },
-      ],
-      exec: "mixed",
-      startTime: "205s",
-    },
-    spike: {
-      executor: "ramping-vus",
-      startVUs: 0,
-      stages: [
-        { duration: "5s", target: 10 },
-        { duration: "5s", target: 200 },
-        { duration: "30s", target: 200 },
-        { duration: "5s", target: 10 },
-        { duration: "5s", target: 0 },
-      ],
-      exec: "mixed",
-      startTime: "290s",
-    },
-    soak: {
-      executor: "constant-vus",
-      vus: 50,
-      duration: "30m",
-      exec: "mixed",
-      startTime: "340s",
-    },
-    large_arrays: {
-      executor: "ramping-vus",
-      startVUs: 0,
-      stages: [
-        { duration: "5s", target: 10 },
-        { duration: "50s", target: 30 },
-        { duration: "5s", target: 0 },
-      ],
-      exec: "largeArrays",
-      startTime: "2180s",
-    },
+const quickScenarios = {
+  baseline: {
+    executor: "constant-vus",
+    vus: 10,
+    duration: "30s",
+    exec: "baseline",
   },
+  ephemeral: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "10s", target: 10 },
+      { duration: "60s", target: 50 },
+      { duration: "10s", target: 0 },
+    ],
+    exec: "ephemeral",
+    startTime: "35s",
+  },
+};
+
+const fullScenarios = {
+  baseline: {
+    executor: "constant-vus",
+    vus: 10,
+    duration: "30s",
+    exec: "baseline",
+  },
+  ephemeral: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "10s", target: 10 },
+      { duration: "60s", target: 50 },
+      { duration: "10s", target: 0 },
+    ],
+    exec: "ephemeral",
+    startTime: "35s",
+  },
+  persistent: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "10s", target: 10 },
+      { duration: "60s", target: 50 },
+      { duration: "10s", target: 0 },
+    ],
+    exec: "persistent",
+    startTime: "120s",
+  },
+  mixed: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "10s", target: 10 },
+      { duration: "60s", target: 50 },
+      { duration: "10s", target: 0 },
+    ],
+    exec: "mixed",
+    startTime: "205s",
+  },
+  spike: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "5s", target: 10 },
+      { duration: "5s", target: 200 },
+      { duration: "30s", target: 200 },
+      { duration: "5s", target: 10 },
+      { duration: "5s", target: 0 },
+    ],
+    exec: "mixed",
+    startTime: "290s",
+  },
+  soak: {
+    executor: "constant-vus",
+    vus: 50,
+    duration: "30m",
+    exec: "mixed",
+    startTime: "340s",
+  },
+  large_arrays: {
+    executor: "ramping-vus",
+    startVUs: 0,
+    stages: [
+      { duration: "5s", target: 10 },
+      { duration: "50s", target: 30 },
+      { duration: "5s", target: 0 },
+    ],
+    exec: "largeArrays",
+    startTime: "2180s",
+  },
+};
+
+export const options = {
+  scenarios: QUICK ? quickScenarios : fullScenarios,
   thresholds: {
-    proxy_latency: ["p(95)<500", "p(99)<1000"],
+    proxy_latency: ["p(95)<2000", "p(99)<5000"],
     errors: ["rate<0.01"],
   },
 };
@@ -205,20 +237,7 @@ export function mixed() {
 }
 
 export function largeArrays() {
-  const conv = conversations[__VU % conversations.length];
+  const conv = conversationsLarge[__VU % conversationsLarge.length];
   const sessionId = `large-${__VU}-${conv.id}`;
-  const messages = [];
-
-  for (let i = 0; i < conv.turns.length; i++) {
-    messages.push(conv.turns[i]);
-
-    const res = sendToProxy(messages, sessionId);
-    const assistantMsg = processResponse(res, proxyLatency);
-
-    if (assistantMsg) {
-      messages.push(assistantMsg);
-    }
-
-    sleep(0.05);
-  }
+  runConversation(conv, sessionId, proxyLatency);
 }

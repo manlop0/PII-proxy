@@ -1,0 +1,47 @@
+{
+  "PERSON": [
+    "John Smith",
+    "Maria Garcia",
+    "James Johnson",
+    "Emily Williams",
+    "Robert Brown"
+  ],
+  "ORG": [
+    "Acme Corp",
+    "Google",
+    "Stanford University",
+    "Microsoft",
+    "Amazon"
+  ],
+  "LOCATION": [
+    "New York",
+    "London",
+    "Berlin",
+    "Tokyo",
+    "San Francisco"
+  ],
+  "PHONE": [
+    "+1-555-123-4567",
+    "+44-20-7946-0958",
+    "+49-30-12345678",
+    "+81-3-1234-5678",
+    "+1-555-987-6543"
+  ],
+  "EMAIL": [
+    "john@example.com",
+    "maria@gmail.com",
+    "james@university.edu",
+    "emily@company.org",
+    "robert@mail.com"
+  ],
+  "CREDIT_CARD": [
+    "4111-1111-1111-1111",
+    "5500-0000-0000-0004",
+    "3400-0000-0000-009"
+  ],
+  "IP_ADDRESS": [
+    "192.168.1.1",
+    "10.0.0.50",
+    "172.16.0.100"
+  ]
+}

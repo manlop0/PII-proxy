@@ -2,3 +2,5 @@ models/
 .idea/
 .DS_Store
 *.iml
+loadtest/scripts/data/
+loadtest/results/

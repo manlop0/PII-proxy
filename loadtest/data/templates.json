@@ -1,0 +1,76 @@
+{
+  "user": {
+    "intro": [
+      "My name is {PERSON}.",
+      "I'm {PERSON}.",
+      "Call me {PERSON}.",
+      "You can reach me at {PERSON}.",
+      "{PERSON} here, nice to meet you.",
+      "Hi, I'm {PERSON}.",
+      "Hello, my name is {PERSON}."
+    ],
+    "location": [
+      "I live in {LOCATION}.",
+      "My address is {LOCATION}.",
+      "I'm based in {LOCATION}.",
+      "Located in {LOCATION}.",
+      "I'm currently in {LOCATION}.",
+      "My home is in {LOCATION}."
+    ],
+    "phone": [
+      "My phone is {PHONE}.",
+      "Call me at {PHONE}.",
+      "Reach me at {PHONE}.",
+      "Phone number: {PHONE}.",
+      "You can call {PHONE}.",
+      "Contact number is {PHONE}."
+    ],
+    "org": [
+      "I work at {ORG}.",
+      "I'm with {ORG}.",
+      "My company is {ORG}.",
+      "Employed at {ORG}.",
+      "I'm currently at {ORG}.",
+      "My employer is {ORG}."
+    ],
+    "email": [
+      "My email is {EMAIL}.",
+      "Contact me at {EMAIL}.",
+      "Email: {EMAIL}.",
+      "You can email me at {EMAIL}.",
+      "Send to {EMAIL}.",
+      "My address is {EMAIL}."
+    ],
+    "card": [
+      "Card number {CREDIT_CARD}.",
+      "My card is {CREDIT_CARD}.",
+      "Pay with {CREDIT_CARD}.",
+      "Billing card: {CREDIT_CARD}.",
+      "Use card {CREDIT_CARD}."
+    ],
+    "ip": [
+      "My IP is {IP_ADDRESS}.",
+      "IP address: {IP_ADDRESS}.",
+      "From {IP_ADDRESS}.",
+      "Connecting from {IP_ADDRESS}.",
+      "Network: {IP_ADDRESS}."
+    ],
+    "free": [
+      "Can you confirm my details?",
+      "What information do you have about me?",
+      "Please summarize everything.",
+      "Is my data secure?",
+      "How do you handle my personal information?",
+      "Can you repeat back what I told you?",
+      "What else do you need from me?",
+      "Let's continue our conversation.",
+      "I have another question.",
+      "Tell me more about your services.",
+      "What can you help me with?",
+      "I'd like to know more.",
+      "Can you assist me with something?",
+      "How does this work?",
+      "What are my options?"
+    ]
+  }
+}

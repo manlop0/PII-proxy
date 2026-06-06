@@ -1,0 +1,38 @@
+server:
+  port: 8080
+
+providers:
+  mock:
+    host: mock
+    port: 9090
+
+storage:
+  path: "/app/data/pii-cache.db"
+
+logging:
+  level: "DEBUG"
+
+ml:
+  model_directory: "/app/models/Babelscape"
+  intra_op_threads: 1
+  batch_size: 16
+  batch_timeout_ms: 10
+  max_queue_size: 1000
+  output_adapter: "BIO"
+  ignored_tags: []
+
+pipeline:
+  entity_resolution:
+    enabled: true
+    algorithm: "jaro-winkler"
+    threshold: 0.88
+    fuzzy_types: ["PERSON", "LOCATION", "ORGANIZATION"]
+  gateway_system_prompt: >
+    System Note: Enterprise Data Privacy Gateway Active.
+    Treat tags as literal, actual data.
+  conflict_strategy: "REGEX_PRIORITY"
+  filters:
+    email: true
+    phone: true
+    credit_card: true
+    ip_address: true

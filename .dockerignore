@@ -2,7 +2,7 @@ backend/build/
 backend/.gradle/
 backend/.idea/
 backend/data/
-backend/models/
+models/
 loadtest/
 .git/
 *.md

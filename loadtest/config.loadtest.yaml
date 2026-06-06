@@ -19,7 +19,7 @@ ml:
   batch_timeout_ms: 10
   max_queue_size: 1000
   output_adapter: "BIO"
-  ignored_tags: []
+  ignored_tags: ["MISC"]
 
 pipeline:
   entity_resolution:

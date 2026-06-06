@@ -4,10 +4,10 @@ services:
     ports:
       - "9090:9090"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9090/health"]
-      interval: 5s
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9090/health')"]
+      interval: 3s
       timeout: 3s
-      retries: 3
+      retries: 5
 
   proxy:
     build: .

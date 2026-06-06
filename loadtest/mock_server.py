@@ -1,4 +1,4 @@
-"""Smart mock LLM server for load testing.
+"""Smart mock LLM server for load testing (async).
 
 Receives OpenAI-format chat completion requests, extracts <TYPE_N> tags
 from user messages, and generates responses that reference those tags.
@@ -9,13 +9,14 @@ Endpoints:
   GET  /health              — readiness check
 """
 
+import asyncio
 import json
 import random
 import re
-import threading
+import sys
 import time
-from http.server import HTTPServer, BaseHTTPRequestHandler
-from socketserver import ThreadingMixIn
+
+from aiohttp import web
 
 TAG_PATTERN = re.compile(r"<[A-Z_]+_\d+>")
 
@@ -40,24 +41,26 @@ RESPONSE_TEMPLATES = [
 MAX_SESSIONS = 10000
 SESSION_TTL = 300
 
-lock = threading.Lock()
 session_tags = {}
 session_last_access = {}
 request_count = 0
 
 
+def log(msg):
+    print(msg, flush=True, file=sys.stderr)
+
+
 def cleanup_sessions():
     now = time.time()
-    with lock:
-        expired = [sid for sid, ts in session_last_access.items() if now - ts > SESSION_TTL]
-        for sid in expired:
-            del session_tags[sid]
-            del session_last_access[sid]
-        if len(session_tags) > MAX_SESSIONS:
-            oldest = sorted(session_last_access, key=session_last_access.get)
-            for sid in oldest[:len(session_tags) - MAX_SESSIONS]:
-                del session_tags[sid]
-                del session_last_access[sid]
+    expired = [sid for sid, ts in session_last_access.items() if now - ts > SESSION_TTL]
+    for sid in expired:
+        session_tags.pop(sid, None)
+        session_last_access.pop(sid, None)
+    if len(session_tags) > MAX_SESSIONS:
+        oldest = sorted(session_last_access, key=session_last_access.get)
+        for sid in oldest[: len(session_tags) - MAX_SESSIONS]:
+            session_tags.pop(sid, None)
+            session_last_access.pop(sid, None)
 
 
 def extract_tags(messages):
@@ -75,7 +78,7 @@ def generate_response(tags):
 
     template = random.choice(RESPONSE_TEMPLATES)
     placeholders = template.count("{")
-    fill = tags[:min(placeholders, len(tags))]
+    fill = tags[: min(placeholders, len(tags))]
     while len(fill) < placeholders:
         fill.append(fill[-1] if fill else "that")
 
@@ -85,100 +88,87 @@ def generate_response(tags):
         return f"Noted, {tags[0]}. Anything else?"
 
 
-class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
-    daemon_threads = True
+async def handle_health(request):
+    return web.json_response({"status": "UP", "sessions": len(session_tags)})
 
 
-class MockHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path == "/health":
-            with lock:
-                active = len(session_tags)
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.end_headers()
-            self.wfile.write(json.dumps({"status": "UP", "sessions": active}).encode())
-        else:
-            self.send_response(404)
-            self.end_headers()
+async def handle_completions(request):
+    global request_count
 
-    def do_POST(self):
-        global request_count
+    try:
+        raw = await request.read()
+        data = json.loads(raw)
+    except Exception as e:
+        log(f"Parse error: {e}")
+        return web.json_response({"error": str(e)}, status=400)
 
-        if self.path != "/v1/chat/completions":
-            self.send_response(404)
-            self.end_headers()
-            return
+    messages = data.get("messages", [])
+    session_id = request.headers.get("X-Conversation-Id", "default")
 
-        content_length = int(self.headers.get("Content-Length", 0))
-        body = self.rfile.read(content_length)
+    request_count += 1
+    if request_count % 500 == 0:
+        cleanup_sessions()
 
-        try:
-            data = json.loads(body)
-        except json.JSONDecodeError:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b'{"error": "Invalid JSON"}')
-            return
+    if session_id not in session_tags:
+        session_tags[session_id] = []
 
-        messages = data.get("messages", [])
-        session_id = self.headers.get("X-Conversation-Id", "default")
+    new_tags = extract_tags(messages)
+    for tag in new_tags:
+        if tag not in session_tags[session_id]:
+            session_tags[session_id].append(tag)
 
-        with lock:
-            request_count += 1
-            if request_count % 500 == 0:
-                cleanup_sessions()
+    all_tags = list(session_tags[session_id])
+    session_last_access[session_id] = time.time()
 
-            if session_id not in session_tags:
-                session_tags[session_id] = []
+    response_content = generate_response(all_tags)
 
-            new_tags = extract_tags(messages)
-            for tag in new_tags:
-                if tag not in session_tags[session_id]:
-                    session_tags[session_id].append(tag)
+    prompt_tokens = sum(len(m.get("content", "").split()) for m in messages)
+    completion_tokens = len(response_content.split())
 
-            all_tags = list(session_tags[session_id])
-            session_last_access[session_id] = time.time()
+    response = {
+        "id": f"mock-{random.randint(1000, 9999)}",
+        "object": "chat.completion",
+        "model": "mock-model",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": response_content},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens,
+            "total_tokens": prompt_tokens + completion_tokens,
+        },
+    }
 
-        response_content = generate_response(all_tags)
+    body = json.dumps(response)
+    return web.Response(body=body, content_type="application/json")
 
-        response = {
-            "id": f"mock-{random.randint(1000, 9999)}",
-            "object": "chat.completion",
-            "model": "mock-model",
-            "choices": [
-                {
-                    "index": 0,
-                    "message": {
-                        "role": "assistant",
-                        "content": response_content,
-                    },
-                    "finish_reason": "stop",
-                }
-            ],
-            "usage": {
-                "prompt_tokens": sum(len(m.get("content", "").split()) for m in messages),
-                "completion_tokens": len(response_content.split()),
-                "total_tokens": 0,
-            },
-        }
-        response["usage"]["total_tokens"] = (
-            response["usage"]["prompt_tokens"] + response["usage"]["completion_tokens"]
-        )
 
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode())
+async def cleanup_loop():
+    while True:
+        await asyncio.sleep(60)
+        cleanup_sessions()
 
-    def log_message(self, format, *args):
-        pass
+
+async def on_startup(app):
+    log("Mock server started on port 9090")
+    asyncio.create_task(cleanup_loop())
+
+
+def create_app():
+    app = web.Application()
+    app.router.add_get("/health", handle_health)
+    app.router.add_post("/v1/chat/completions", handle_completions)
+    app.on_startup.append(on_startup)
+    return app
 
 
 def main():
-    server = ThreadingHTTPServer(("0.0.0.0", 9090), MockHandler)
-    print("Mock server running on port 9090 (threaded)")
-    server.serve_forever()
+    app = create_app()
+    web.run_app(app, host="0.0.0.0", port=9090, print=lambda *a: None)
 
 
 if __name__ == "__main__":

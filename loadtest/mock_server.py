@@ -12,7 +12,10 @@ Endpoints:
 import json
 import random
 import re
+import threading
+import time
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 
 TAG_PATTERN = re.compile(r"<[A-Z_]+_\d+>")
 
@@ -34,7 +37,27 @@ RESPONSE_TEMPLATES = [
     "Recorded your information: {0} and {1}.",
 ]
 
+MAX_SESSIONS = 10000
+SESSION_TTL = 300
+
+lock = threading.Lock()
 session_tags = {}
+session_last_access = {}
+request_count = 0
+
+
+def cleanup_sessions():
+    now = time.time()
+    with lock:
+        expired = [sid for sid, ts in session_last_access.items() if now - ts > SESSION_TTL]
+        for sid in expired:
+            del session_tags[sid]
+            del session_last_access[sid]
+        if len(session_tags) > MAX_SESSIONS:
+            oldest = sorted(session_last_access, key=session_last_access.get)
+            for sid in oldest[:len(session_tags) - MAX_SESSIONS]:
+                del session_tags[sid]
+                del session_last_access[sid]
 
 
 def extract_tags(messages):
@@ -62,18 +85,26 @@ def generate_response(tags):
         return f"Noted, {tags[0]}. Anything else?"
 
 
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
+
 class MockHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/health":
+            with lock:
+                active = len(session_tags)
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
-            self.wfile.write(b'{"status": "UP"}')
+            self.wfile.write(json.dumps({"status": "UP", "sessions": active}).encode())
         else:
             self.send_response(404)
             self.end_headers()
 
     def do_POST(self):
+        global request_count
+
         if self.path != "/v1/chat/completions":
             self.send_response(404)
             self.end_headers()
@@ -93,15 +124,22 @@ class MockHandler(BaseHTTPRequestHandler):
         messages = data.get("messages", [])
         session_id = self.headers.get("X-Conversation-Id", "default")
 
-        if session_id not in session_tags:
-            session_tags[session_id] = []
+        with lock:
+            request_count += 1
+            if request_count % 500 == 0:
+                cleanup_sessions()
 
-        new_tags = extract_tags(messages)
-        for tag in new_tags:
-            if tag not in session_tags[session_id]:
-                session_tags[session_id].append(tag)
+            if session_id not in session_tags:
+                session_tags[session_id] = []
 
-        all_tags = session_tags[session_id]
+            new_tags = extract_tags(messages)
+            for tag in new_tags:
+                if tag not in session_tags[session_id]:
+                    session_tags[session_id].append(tag)
+
+            all_tags = list(session_tags[session_id])
+            session_last_access[session_id] = time.time()
+
         response_content = generate_response(all_tags)
 
         response = {
@@ -138,8 +176,8 @@ class MockHandler(BaseHTTPRequestHandler):
 
 
 def main():
-    server = HTTPServer(("0.0.0.0", 9090), MockHandler)
-    print("Mock server running on port 9090")
+    server = ThreadingHTTPServer(("0.0.0.0", 9090), MockHandler)
+    print("Mock server running on port 9090 (threaded)")
     server.serve_forever()
 
 

@@ -182,6 +182,13 @@ const fullScenarios = {
     exec: "largeArrays",
     startTime: "2180s",
   },
+  cache_test: {
+    executor: "shared-iterations",
+    vus: 5,
+    iterations: conversations.length,
+    exec: "cacheTest",
+    startTime: "0s",
+  },
 };
 
 export const options = {
@@ -240,4 +247,21 @@ export function largeArrays() {
   const conv = conversationsLarge[__VU % conversationsLarge.length];
   const sessionId = `large-${__VU}-${conv.id}`;
   runConversation(conv, sessionId, proxyLatency);
+}
+
+export function cacheTest() {
+  const conv = conversations[__ITER % conversations.length];
+  const sessionId = `cache-${conv.id}`;
+
+  const messages = [];
+  for (let i = 0; i < conv.turns.length; i++) {
+    messages.push(conv.turns[i]);
+
+    const res = sendToProxy(messages, sessionId);
+    const assistantMsg = processResponse(res, proxyLatency);
+
+    if (assistantMsg) {
+      messages.push(assistantMsg);
+    }
+  }
 }

@@ -60,6 +60,9 @@ echo "[5/7] Running k6 load tests..."
 if [ "$MODE" = "quick" ]; then
   docker compose -f "$COMPOSE_FILE" \
     --profile loadtest run --rm -e QUICK=true k6 run /scripts/loadtest.js
+elif [ "$MODE" = "cache" ]; then
+  docker compose -f "$COMPOSE_FILE" \
+    --profile loadtest run --rm -e QUICK=true k6 run /scripts/loadtest.js --scenario cache_test
 elif [ "$MODE" = "all" ]; then
   docker compose -f "$COMPOSE_FILE" \
     --profile loadtest run --rm k6 run /scripts/loadtest.js

@@ -46,6 +46,16 @@ for i in $(seq 1 30); do
 done
 echo ""
 
+echo ""
+echo "[4.5/7] Warming up ML model..."
+for i in 1 2 3; do
+  curl -s -X POST http://localhost:8080/mock/v1/chat/completions \
+    -H "Content-Type: application/json" \
+    -d '{"model":"test","messages":[{"role":"user","content":"warmup request"}]}' > /dev/null 2>&1 || true
+done
+echo "Warmup complete."
+echo ""
+
 echo "[5/7] Running k6 load tests..."
 if [ "$MODE" = "quick" ]; then
   docker compose -f "$COMPOSE_FILE" \

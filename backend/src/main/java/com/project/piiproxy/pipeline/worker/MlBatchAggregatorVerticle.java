@@ -89,6 +89,8 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
     List<Message<String>> batchToProcess = new ArrayList<>(currentBatch);
     currentBatch.clear();
 
+    String reason = batchToProcess.size() >= batchSize ? "BATCH_FULL" : "TIMEOUT";
+
     Promise<Void> flushPromise = Promise.promise();
     currentFlush = flushPromise;
 
@@ -117,6 +119,7 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
       }
       currentFlush = null;
       flushPromise.complete();
+      log.debug("ML Batch done: size={}, reason={}, pendingAfterFlush={}", batchToProcess.size(), reason, currentBatch.size());
     });
   }
 

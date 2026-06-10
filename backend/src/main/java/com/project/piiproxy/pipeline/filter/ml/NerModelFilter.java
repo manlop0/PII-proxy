@@ -77,6 +77,7 @@ public class NerModelFilter implements AutoCloseable {
   public List<List<Span>> findBatch(List<String> texts) {
     if (texts == null || texts.isEmpty()) return Collections.emptyList();
 
+    long t0 = System.nanoTime();
     Encoding[] encodings = tokenizer.batchEncode(texts);
     int batchSize = encodings.length;
     int maxLen = 0;
@@ -142,7 +143,10 @@ public class NerModelFilter implements AutoCloseable {
       }
 
       try (OrtSession.Result result = session.run(tensorMap)) {
-        return outputAdapter.extractBatchSpans(result, encodings, texts);
+        List<List<Span>> spans = outputAdapter.extractBatchSpans(result, encodings, texts);
+        long elapsedMs = (System.nanoTime() - t0) / 1_000_000;
+        log.debug("ML Inference: batchSize={}, {}ms ({}ms/text)", batchSize, elapsedMs, elapsedMs / batchSize);
+        return spans;
       }
 
     } catch (Exception e) {

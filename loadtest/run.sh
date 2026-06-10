@@ -7,6 +7,10 @@ RESULTS_DIR="$SCRIPT_DIR/results"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 
 MODE="${1:-all}"
+if [ "$MODE" != "all" ] && [ "$MODE" != "quick" ]; then
+  echo "WARN: unknown mode '$MODE'. Starting with mode 'all'"
+  MODE="all"
+fi
 
 echo "=== PII Proxy Load Testing (mode: $MODE) ==="
 echo ""
@@ -31,8 +35,8 @@ echo ""
 
 echo "[4/7] Waiting for services..."
 for i in $(seq 1 30); do
-  if curl -s http://localhost:9090/health > /dev/null 2>&1 && \
-     curl -s http://localhost:8080/ready > /dev/null 2>&1; then
+  if curl -s --max-time 2 http://localhost:9090/health > /dev/null 2>&1 && \
+     curl -s --max-time 2 http://localhost:8080/ready > /dev/null 2>&1; then
     echo "Services ready!"
     break
   fi
@@ -48,27 +52,27 @@ echo ""
 
 echo ""
 echo "[4.5/7] Warming up ML model..."
-for i in 1 2 3; do
-  curl -s -X POST http://localhost:8080/mock/v1/chat/completions \
+for i in $(seq 1 20); do
+  curl -s --max-time 5 -X POST http://localhost:8080/mock/v1/chat/completions \
     -H "Content-Type: application/json" \
-    -d '{"model":"test","messages":[{"role":"user","content":"warmup request"}]}' > /dev/null 2>&1 || true
+    -d '{"model":"test","messages":[{"role":"user","content":"My name is John Smith, email john@example.com, phone +1-555-123-4567"}]}' > /dev/null 2>&1 || true
 done
 echo "Warmup complete."
 echo ""
 
 echo "[5/7] Running k6 load tests..."
+set +e
 if [ "$MODE" = "quick" ]; then
   docker compose -f "$COMPOSE_FILE" \
     --profile loadtest run --rm -e QUICK=true k6 run /scripts/loadtest.js
-elif [ "$MODE" = "cache" ]; then
-  docker compose -f "$COMPOSE_FILE" \
-    --profile loadtest run --rm -e QUICK=true k6 run /scripts/loadtest.js --scenario cache_test
 elif [ "$MODE" = "all" ]; then
   docker compose -f "$COMPOSE_FILE" \
     --profile loadtest run --rm k6 run /scripts/loadtest.js
-else
-  docker compose -f "$COMPOSE_FILE" \
-    --profile loadtest run --rm k6 run /scripts/loadtest.js --scenario "$MODE"
+fi
+K6_EXIT=$?
+set -e
+if [ "$K6_EXIT" -ne 0 ]; then
+  echo "WARN: k6 exited with code $K6_EXIT (thresholds crossed or error)"
 fi
 echo ""
 

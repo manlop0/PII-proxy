@@ -16,7 +16,7 @@ ml:
   model_directory: "/app/models/Babelscape"
   intra_op_threads: 1
   batch_size: 16
-  batch_timeout_ms: 10
+  batch_timeout_ms: 50
   max_queue_size: 1000
   output_adapter: "BIO"
   ignored_tags: ["MISC"]

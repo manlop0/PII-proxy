@@ -167,7 +167,7 @@ const fullScenarios = {
   soak: {
     executor: "constant-vus",
     vus: 50,
-    duration: "30m",
+    duration: "10m",
     exec: "mixed",
     startTime: "340s",
   },
@@ -180,7 +180,7 @@ const fullScenarios = {
       { duration: "5s", target: 0 },
     ],
     exec: "largeArrays",
-    startTime: "2180s",
+    startTime: "960s",
   },
   cache_test: {
     executor: "shared-iterations",

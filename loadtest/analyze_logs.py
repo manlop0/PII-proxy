@@ -6,6 +6,8 @@ Expected log patterns:
   [DEBUG] Anonymized session=X in 1200µs
   [DEBUG] Anonymized session=X in 1200µs (cache hit)
   [DEBUG] Restored N tags in 'context' for session X in 300µs
+  [DEBUG] ML Batch done: size=16, reason=BATCH_FULL, pendingAfterFlush=0
+  [INFO] ML Inference: batchSize=16, 400ms (25ms/text)
 """
 
 import re
@@ -18,6 +20,12 @@ ANON_PATTERN = re.compile(
 RESTORE_PATTERN = re.compile(
     r"Restored \d+ tags in '(\S+)' for session (\S+) in (\d+)µs"
 )
+BATCH_PATTERN = re.compile(
+    r"ML Batch done: size=(\d+), reason=(\w+), pendingAfterFlush=(\d+)"
+)
+INFERENCE_PATTERN = re.compile(
+    r"ML Inference: batchSize=(\d+), (\d+)ms \((\d+)ms/text\)"
+)
 
 
 def parse_logs(path):
@@ -26,6 +34,12 @@ def parse_logs(path):
     anon_latencies = []
     restore_latencies = []
     session_anon = defaultdict(list)
+
+    batch_sizes = []
+    batch_reasons = defaultdict(int)
+    batch_pending = []
+    inference_times = []
+    inference_per_text = []
 
     with open(path, "r") as f:
         for line in f:
@@ -48,12 +62,28 @@ def parse_logs(path):
                 latency_us = int(m.group(3))
                 restore_latencies.append(latency_us)
 
+            m = BATCH_PATTERN.search(line)
+            if m:
+                batch_sizes.append(int(m.group(1)))
+                batch_reasons[m.group(2)] += 1
+                batch_pending.append(int(m.group(3)))
+
+            m = INFERENCE_PATTERN.search(line)
+            if m:
+                inference_times.append(int(m.group(2)))
+                inference_per_text.append(int(m.group(3)))
+
     return {
         "anon_hits": anon_hits,
         "anon_misses": anon_misses,
         "anon_latencies": sorted(anon_latencies),
         "restore_latencies": sorted(restore_latencies),
         "session_count": len(session_anon),
+        "batch_sizes": sorted(batch_sizes),
+        "batch_reasons": dict(batch_reasons),
+        "batch_pending": sorted(batch_pending),
+        "inference_times": sorted(inference_times),
+        "inference_per_text": sorted(inference_per_text),
     }
 
 
@@ -102,6 +132,31 @@ def analyze(stats):
         print(f"Max: {rest[-1]}µs ({rest[-1]/1000:.1f}ms)")
     else:
         print("No restore latency data found.")
+
+    bs = stats["batch_sizes"]
+    bp = stats["batch_pending"]
+    br = stats["batch_reasons"]
+    it = stats["inference_times"]
+    ipt = stats["inference_per_text"]
+
+    print()
+    print("=== ML Batching ===")
+    if bs:
+        print(f"Total batches: {len(bs)}")
+        print(f"Batch size P50: {percentile(bs, 50)}, P95: {percentile(bs, 95)}, Max: {bs[-1]}")
+        print(f"Flush reasons: {br}")
+        print(f"Pending after flush P50: {percentile(bp, 50)}, P95: {percentile(bp, 95)}, Max: {bp[-1]}")
+    else:
+        print("No batch metrics found.")
+
+    print()
+    print("=== ML Inference ===")
+    if it:
+        print(f"Total inferences: {len(it)}")
+        print(f"Inference time P50: {percentile(it, 50)}ms, P95: {percentile(it, 95)}ms, Max: {it[-1]}ms")
+        print(f"Per-text time P50: {percentile(ipt, 50)}ms, P95: {percentile(ipt, 95)}ms, Max: {ipt[-1]}ms")
+    else:
+        print("No inference metrics found.")
 
 
 def main():

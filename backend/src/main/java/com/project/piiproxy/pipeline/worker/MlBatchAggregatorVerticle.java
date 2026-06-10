@@ -9,11 +9,13 @@ import io.vertx.core.Promise;
 import io.vertx.core.eventbus.Message;
 import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
+import io.vertx.core.WorkerExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Aggregates concurrent requests into ML inference batches and forwards them to {@link NerModelFilter}.
@@ -31,6 +33,7 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
   private List<Message<String>> currentBatch = new ArrayList<>();
   private long timerId = -1;
   private Promise<Void> currentFlush;
+  private WorkerExecutor mlExecutor;
 
   public MlBatchAggregatorVerticle(NerModelFilter mlFilter, int batchSize, int batchTimeoutMs, int maxQueueSize) {
     this.mlFilter = mlFilter;
@@ -41,6 +44,10 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
 
   @Override
   public void start() {
+    int poolSize = Runtime.getRuntime().availableProcessors();
+    mlExecutor = vertx.createSharedWorkerExecutor("ml-inference", poolSize, 60, TimeUnit.SECONDS);
+    log.info("ML Aggregator Verticle started. Pool size: {}, thread: {}", poolSize, Thread.currentThread().getName());
+
     vertx.eventBus().<String>consumer(BusAddresses.ML_NER_ANALYZE, msg -> {
       String text = msg.body();
 
@@ -85,7 +92,7 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
     Promise<Void> flushPromise = Promise.promise();
     currentFlush = flushPromise;
 
-    vertx.executeBlocking(() -> {
+    mlExecutor.executeBlocking(() -> {
       List<String> texts = new ArrayList<>(batchToProcess.size());
       for (Message<String> msg : batchToProcess) {
         texts.add(msg.body());
@@ -125,6 +132,9 @@ public class MlBatchAggregatorVerticle extends AbstractVerticle {
     Runnable closeMlFilter = () -> {
       try {
         mlFilter.close();
+        if (mlExecutor != null) {
+          mlExecutor.close();
+        }
         log.info("ML filter resources released.");
         stopPromise.complete();
       } catch (Exception e) {

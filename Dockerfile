@@ -15,6 +15,6 @@ RUN --mount=type=cache,target=/root/.gradle \
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=builder /build/build/libs/*-fat.jar app.jar
-COPY backend/src/main/resources/config.yaml config.yaml
+COPY config.yaml config.yaml
 EXPOSE 8080
 ENTRYPOINT ["java", "-XX:+UseG1GC", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

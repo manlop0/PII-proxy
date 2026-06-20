@@ -1,0 +1,37 @@
+services:
+  mock:
+    build: .
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:9090/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+
+  proxy:
+    build: ..
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../models:/app/models:ro
+      - ../backend/data:/app/data
+      - ./config.loadtest.yaml:/app/config.yaml
+    environment:
+      JAVA_TOOL_OPTIONS: >-
+        -Xlog:gc*:file=/app/gc.log:time,uptime,level,tags:filecount=5,filesize=10m
+        -Xms256m -Xmx512m
+        -XX:+UseG1GC
+    depends_on:
+      mock:
+        condition: service_healthy
+
+  k6:
+    image: grafana/k6:latest
+    volumes:
+      - ./scripts:/scripts:ro
+      - ./results:/results
+    depends_on:
+      - proxy
+    profiles:
+      - loadtest

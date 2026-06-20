@@ -2,9 +2,8 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 RESULTS_DIR="$SCRIPT_DIR/results"
-COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
+COMPOSE_FILE="$SCRIPT_DIR/docker-compose.yml"
 
 MODE="${1:-quick}"
 if [ "$MODE" != "all" ] && [ "$MODE" != "quick" ]; then
@@ -52,7 +51,7 @@ echo ""
 
 echo ""
 echo "[4.5/7] Warming up ML model..."
-for i in $(seq 1 20); do
+for i in $(seq 1 5); do
   curl -s --max-time 5 -X POST http://localhost:8080/mock/v1/chat/completions \
     -H "Content-Type: application/json" \
     -d '{"model":"test","messages":[{"role":"user","content":"My name is John Smith, email john@example.com, phone +1-555-123-4567"}]}' > /dev/null 2>&1 || true

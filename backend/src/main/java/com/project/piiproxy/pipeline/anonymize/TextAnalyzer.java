@@ -65,15 +65,32 @@ public class TextAnalyzer {
 
     long t0 = System.nanoTime();
     String hash = hasher.computeHash(text);
+
+    long cacheStart = System.nanoTime();
     return vertx.executeBlocking(() -> {
       String cached = storage.getCachedAnonymizedText(sessionId, hash);
       if (cached != null) {
-        log.debug("Anonymized session={} in {}µs (cache hit)", sessionId, (System.nanoTime() - t0) / 1_000);
+        long cacheNs = System.nanoTime() - cacheStart;
+        long totalNs = System.nanoTime() - t0;
+        log.debug("Pipeline: total={}ms, cache={}ms, regex=0, ml=0, subst=0 (hit)",
+            totalNs / 1_000_000, cacheNs / 1_000_000);
         return cached;
       }
       return null;
     }, false).compose(cached -> {
       if (cached != null) return Future.succeededFuture(cached);
+
+      long cacheNs = System.nanoTime() - cacheStart;
+
+      long regexStart = System.nanoTime();
+      List<Span> regexSpans = new ArrayList<>();
+      for (TextFilter filter : filters) {
+        regexSpans.addAll(filter.find(text));
+      }
+      long regexNs = System.nanoTime() - regexStart;
+      if (log.isDebugEnabled()) {
+        log.debug("Found Regex spans:{}", regexSpans.isEmpty() ? " none" : regexSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
+      }
 
       Future<List<Span>> mlFuture = vertx.eventBus().<JsonArray>request(BusAddresses.ML_NER_ANALYZE, text)
         .map(reply -> {
@@ -87,15 +104,8 @@ public class TextAnalyzer {
           return Future.succeededFuture(new ArrayList<>());
         });
 
-      List<Span> regexSpans = new ArrayList<>();
-      for (TextFilter filter : filters) {
-        regexSpans.addAll(filter.find(text));
-      }
-      if (log.isDebugEnabled()) {
-        log.debug("Found Regex spans:{}", regexSpans.isEmpty() ? " none" : regexSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
-      }
-
       return mlFuture.compose(mlSpans -> vertx.executeBlocking(() -> {
+        long substStart = System.nanoTime();
 
         if (log.isDebugEnabled()) {
           log.debug("Received from ML:{}", mlSpans.isEmpty() ? " none" : mlSpans.stream().map(Span::toString).collect(Collectors.joining("\n  - ", "\n  - ", "")));
@@ -109,7 +119,11 @@ public class TextAnalyzer {
 
         String result = substitutor.substitute(text, sessionId, resolvedSpans);
         storage.cacheAnonymizedText(sessionId, hash, result);
-        log.debug("Anonymized session={} in {}µs", sessionId, (System.nanoTime() - t0) / 1_000);
+
+        long substNs = System.nanoTime() - substStart;
+        long totalNs = System.nanoTime() - t0;
+        log.debug("Pipeline: total={}ms, cache={}ms, regex={}ms, subst={}ms",
+            totalNs / 1_000_000, cacheNs / 1_000_000, regexNs / 1_000_000, substNs / 1_000_000);
         return result;
       }, false));
     });

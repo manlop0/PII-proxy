@@ -6,10 +6,10 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 RESULTS_DIR="$SCRIPT_DIR/results"
 COMPOSE_FILE="$PROJECT_DIR/docker-compose.yml"
 
-MODE="${1:-all}"
+MODE="${1:-quick}"
 if [ "$MODE" != "all" ] && [ "$MODE" != "quick" ]; then
-  echo "WARN: unknown mode '$MODE'. Starting with mode 'all'"
-  MODE="all"
+  echo "WARN: unknown mode '$MODE'. Starting with mode 'quick'"
+  MODE="quick"
 fi
 
 echo "=== PII Proxy Load Testing (mode: $MODE) ==="

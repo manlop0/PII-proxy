@@ -38,6 +38,7 @@ dependencies {
   implementation("ai.djl.huggingface:tokenizers:0.36.0")
   testImplementation("io.vertx:vertx-junit5")
   testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
+  testImplementation("org.mockito:mockito-core:5.11.0")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

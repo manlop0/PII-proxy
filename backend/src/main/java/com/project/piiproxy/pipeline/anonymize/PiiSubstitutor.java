@@ -34,11 +34,11 @@ public class PiiSubstitutor {
       tags.add(storage.saveOriginal(sessionId, tagType, span.value()));
     }
 
-    // Second pass (backward): replacing from end to start keeps earlier indices valid.
-    resolvedSpans.sort((s1, s2) -> Integer.compare(s2.start(), s1.start()));
+    // Second pass (backward): iterate in reverse order so we replace from end to start,
+    // keeping earlier indices valid.
     StringBuilder sb = new StringBuilder(text);
 
-    for (int i = 0; i < resolvedSpans.size(); i++) {
+    for (int i = resolvedSpans.size() - 1; i >= 0; i--) {
       Span span = resolvedSpans.get(i);
       sb.replace(span.start(), span.end(), tags.get(i));
     }

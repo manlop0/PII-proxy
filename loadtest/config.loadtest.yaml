@@ -31,7 +31,8 @@ pipeline:
     Treat tags as literal, actual data.
   conflict_strategy: "REGEX_PRIORITY"
   filters:
-    email: true
-    phone: true
-    credit_card: true
-    ip_address: true
+    names:
+      - "email"
+      - "phone"
+      - "credit_card"
+      - "ip_address"

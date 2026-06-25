@@ -27,8 +27,9 @@ logging:
 
 # Machine Learning pipeline configuration (ONNX Runtime)
 ml:
-  # Path to the directory containing ONNX model, config.json and tokenizer.json
-  model_directory: "./models/Babelscape"
+  # Path to the directory containing ONNX model, config.json and tokenizer.json.
+  # Replace <your-model> with the directory name of model after downloading and converting it to onnx format in ./models/.
+  model_directory: "./models/<your-model>"
   # Maximum number of texts to process in a single batch
   batch_size: 16
   # Maximum time to wait for a batch to fill up before processing (in milliseconds)
@@ -45,11 +46,10 @@ ml:
   ignored_tags: [ ]
 
   # Optional: Map internal ML tags to more descriptive tags for LLM context.
-  # For example, mapping 'LOC' to 'LOCATION' will produce <LOCATION_1> instead of <LOC_1>
-  tag_mapping:
-    LOC: "LOCATION"
-    PER: "PERSON"
-    ORG: "ORGANIZATION"
+  # For example, mapping 'LOC' to 'LOCATION' will produce <LOCATION_1> instead of <LOC_1>.
+  # Uncomment and adjust entries to match the labels produced by your model.
+  # tag_mapping:
+  #   <original-tag>: "<human-readable-name>"
 
 # Core anonymization pipeline configuration
 pipeline:
@@ -68,7 +68,8 @@ pipeline:
     # Only these entity types will undergo fuzzy matching.
     # All other types (PHONE, EMAIL, IP_ADDRESS, CREDIT_CARD) will strictly require exact matches
     # to prevent dangerous merging of distinct identifiers.
-    fuzzy_types: [ "PERSON", "LOCATION", "ORGANIZATION" ]
+    # Use the MAPPED tag names from tag_mapping above (e.g. "PERSON", not the raw "PER").
+    # fuzzy_types: [ "<your-type-1>", "<your-type-2>" ]
 
   # System prompt injected to instruct the LLM on how to handle the <TAGS>
   gateway_system_prompt: >

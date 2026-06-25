@@ -6,7 +6,7 @@ Usage:
     python convert_to_onnx.py <model_dir> --task token-classification
 
 Requirements:
-    pip install optimum[exporters] transformers
+    pip install optimum[exporters,onnxruntime] transformers
 
 Supported architectures:
     - BERT, RoBERTa, DistilBERT, ALBERT, Electra, DeBERTa (NER, classification)
@@ -58,7 +58,7 @@ def main():
         from optimum.exporters.onnx import main_export
     except ImportError:
         print("Error: optimum not installed. Run:")
-        print("  pip install optimum[exporters] transformers")
+        print("  pip install optimum[exporters,onnxruntime] transformers")
         sys.exit(1)
 
     try:

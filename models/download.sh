@@ -18,7 +18,7 @@ fi
 pip3 install --quiet huggingface_hub
 
 echo "Downloading model files..."
-huggingface-cli download "$MODEL_NAME" --local-dir "$OUTPUT_DIR"
+hf download "$MODEL_NAME" --local-dir "$OUTPUT_DIR"
 
 echo ""
 echo "=== Download Complete ==="
@@ -28,27 +28,7 @@ echo ""
 CONFIG_JSON="$OUTPUT_DIR/config.json"
 if [ -f "$CONFIG_JSON" ]; then
   echo "=== Model Info ==="
-  python3 -c "
-import json
-with open('$CONFIG_JSON') as f:
-    cfg = json.load(f)
-
-arch = cfg.get('architectures', ['unknown'])[0]
-model_type = cfg.get('model_type', 'unknown')
-labels = cfg.get('id2label', {})
-
-print(f'Architecture: {arch} ({model_type})')
-print(f'Total labels: {len(labels)}')
-
-# Unique entity types (strip B-/I- prefixes, skip O)
-types = set()
-for label in labels.values():
-    if label != 'O':
-        types.add(label.split('-', 1)[-1] if '-' in label else label)
-
-if types:
-    print(f'Entity types: {", ".join(sorted(types))}')
-"
+  python3 "$SCRIPT_DIR/model_info.py" "$CONFIG_JSON"
 fi
 
 echo ""

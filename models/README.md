@@ -2,6 +2,22 @@
 
 PII Proxy uses ONNX Runtime for ML-based NER (Named Entity Recognition). This directory contains the model files.
 
+## Requirements
+
+- **Python 3.8+** with `pip3`
+- **Python packages:**
+  - `huggingface_hub` — for `download.sh` (provides the `hf` CLI command, version >= 0.20)
+  - `optimum[exporters,onnxruntime]` — for `convert_to_onnx.py` (ONNX export via HuggingFace Optimum)
+  - `transformers` — pulled in automatically by `optimum`, but explicit install recommended
+
+### Install dependencies
+
+```bash
+pip3 install huggingface_hub 'optimum[exporters,onnxruntime]' transformers
+```
+
+> `download.sh` auto-installs `huggingface_hub` via `pip3` on first run; `convert_to_onnx.py` requires `optimum[exporters,onnxruntime]` to be pre-installed and will print a clear error otherwise.
+
 ## Quick Start
 
 ```bash
@@ -25,7 +41,7 @@ python3 convert_to_onnx.py Babelscape/wikineural-multilingual-ner
 | GLiNER | urchade/gliner_large-v2.1 | ❌ Custom architecture |
 | Multi-file models | Various | ❌ Not supported |
 
-## Requirements
+## Model Requirements
 
 - Model must have `tokenizer.json` (fast tokenizer)
 - Model must be exportable by HuggingFace Optimum
@@ -46,7 +62,7 @@ python3 convert_to_onnx.py Babelscape/wikineural-multilingual-ner
 
 3. **Test export:**
    ```bash
-   pip install optimum[exporters]
+   pip install optimum[exporters,onnxruntime]
    optimum-cli export onnx --help  # check supported tasks
    ```
 

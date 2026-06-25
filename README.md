@@ -104,7 +104,7 @@ For local testing without an upstream LLM, configure a mock provider — see `lo
 3. Restore:    replace tags back with original values (including SSE chunks)
 ```
 
-The proxy is transparent: your application sends a standard OpenAI-compatible request to `http://localhost:8080/<provider>/...` and receives a standard response. PII tags like `<PERSON_1>`, `<EMAIL_1>` are replaced with deterministic placeholders so the LLM treats them as the actual data.
+The proxy is transparent: your application sends an HTTP request to `http://localhost:8080/<provider>/...` and receives the response back with PII restored. The request/response format follows the codec configured for the provider (OpenAI-compatible by default; custom codecs supported). PII tags like `<PERSON_1>`, `<EMAIL_1>` are replaced with deterministic placeholders so the LLM treats them as the actual data.
 
 ---
 
@@ -328,3 +328,7 @@ com.project.piiproxy/
 - **Detection & storage:** Google RE2/J 1.8 (DFA regex engine), MapDB 3.0.9 (off-heap persistence)
 - **Build & infrastructure:** Gradle (Kotlin DSL), Shadow plugin, Docker multi-stage build, JRE 21
 - **Testing:** JUnit 5, Mockito (57 unit tests), k6 (load testing)
+
+## License
+
+MIT — see [LICENSE](LICENSE).
